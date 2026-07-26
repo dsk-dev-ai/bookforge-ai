@@ -87,5 +87,36 @@ class TestDiskCache:
     def test_invalid_file_returns_none(self, tmp_path: str) -> None:
         cache = DiskCache(str(tmp_path))
         path = cache._path("bad")
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("not valid json")
         assert cache.get("bad") is None
+
+    def test_different_keys_no_collision(self, tmp_path: str) -> None:
+        cache = DiskCache(str(tmp_path))
+        cache.set("key-a", "value-a")
+        cache.set("key-b", "value-b")
+        assert cache.get("key-a") == "value-a"
+        assert cache.get("key-b") == "value-b"
+
+    def test_nested_directory_structure(self, tmp_path: str) -> None:
+        import hashlib
+        cache = DiskCache(str(tmp_path))
+        cache.set("struct-key", "value")
+        path = cache._path("struct-key")
+        h = hashlib.sha256(b"struct-key").hexdigest()
+        assert path.parent.name == h[:2]
+        assert path.name == h[2:]
+        assert path.parent.parent == cache._cache_dir
+
+    def test_serialize_pydantic_model(self, tmp_path: str) -> None:
+        from datetime import datetime
+
+        from bookforge.research.models import ResearchJob
+
+        cache = DiskCache(str(tmp_path))
+        job = ResearchJob(id="j1", topic="test", created_at=datetime.now(), updated_at=datetime.now())
+        cache.set("pydantic", job)
+        retrieved = cache.get("pydantic")
+        assert retrieved is not None
+        assert retrieved.id == "j1"
+        assert retrieved.topic == "test"

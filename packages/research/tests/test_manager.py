@@ -102,6 +102,20 @@ class TestResearchManager:
         cached = cache.get(f"job:{job.id}")
         assert cached is not None
 
+    def test_start_job_raises_for_nonexistent(self) -> None:
+        import pytest
+
+        from bookforge.research.manager import JobNotFoundError
+        manager = ResearchManager()
+        with pytest.raises(JobNotFoundError, match="not found"):
+            manager.start_job("nonexistent")
+
+    def test_start_job_with_start_stage(self) -> None:
+        manager = ResearchManager()
+        job = manager.create_job("Skip ahead")
+        result = manager.start_job(job.id, start_stage=ResearchStatus.VALIDATING)
+        assert result.status == ResearchStatus.COMPLETED
+
     def test_pipeline_injection(self) -> None:
         pipeline = ResearchPipeline()
         manager = ResearchManager(pipeline=pipeline)

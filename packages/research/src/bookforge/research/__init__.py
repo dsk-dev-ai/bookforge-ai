@@ -3,7 +3,7 @@ from bookforge.research.deduplicator import ResearchDeduplicator
 from bookforge.research.engine import ResearchEngine
 from bookforge.research.enums import RankCriterion, ResearchStatus, SourceType, SupportedInput
 from bookforge.research.exporter import ResearchExporter
-from bookforge.research.manager import ResearchManager
+from bookforge.research.manager import JobNotFoundError, ResearchManager
 from bookforge.research.models import (
     ArchitectureNote,
     CodeReference,
@@ -30,6 +30,7 @@ __all__ = [
     "ArchitectureNote",
     "CodeReference",
     "DiskCache",
+    "JobNotFoundError",
     "KeyConcept",
     "MemoryCache",
     "RankCriterion",
