@@ -11,12 +11,11 @@
 - [Container Diagram](#container-diagram)
 - [Subsystem Catalog](#subsystem-catalog)
 - [Provider Architecture](#provider-architecture)
+- [Provider Manager Implementation](#provider-manager-implementation)
 - [Configuration Architecture](#configuration-architecture)
 - [Error Handling Architecture](#error-handling-architecture)
 - [Event Flow](#event-flow)
 - [Storage Architecture](#storage-architecture)
-- [Job Queue Architecture](#job-queue-architecture)
-- [Logging Architecture](#logging-architecture)
 - [Sequence Diagrams](#sequence-diagrams)
 - [Future Scalability](#future-scalability)
 - [Architecture Decision Records](#architecture-decision-records)
@@ -164,192 +163,113 @@ graph TB
 
 ---
 
-## Subsystem Catalog
-
-### Book Manager
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Owns the book entity lifecycle. Creates, reads, updates, deletes, and tracks state transitions for every book. |
-| **State Machine** | `draft → validating → valid → invalid → in_progress → completed → archived` |
-| **Owns** | `books` table, book metadata, status transitions |
-| **Emits** | `book.created`, `book.state_changed`, `book.completed`, `book.archived` |
-| **Why separate?** | Every other subsystem needs to know the book's identity and status. Centralising book identity prevents fragmented state. |
-
-### Project Manager
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Manages the project wrapper around a book — collaboration settings, version tags, user assignments, and project-level configuration. A book is the content; a project is the container. |
-| **Owns** | `projects` table, project membership, version history |
-| **Emits** | `project.created`, `project.collaborator_added`, `project.version_tagged` |
-| **Why separate?** | Book content and project management have different lifecycles. Separating them allows reusing the book pipeline for different project contexts. |
-
-### Provider Manager
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | The LLM provider registry. Holds references to all registered providers, handles provider selection, health checking, and circuit breaking. No other subsystem talks to LLMs directly. |
-| **Owns** | Provider registry, health status cache, circuit breaker state |
-| **Registry** | Providers self-register on startup. The manager selects the active provider based on configuration and health. |
-| **Why separate?** | Every subsystem that needs LLM access (research, writing, review, diagrams, images) would otherwise duplicate provider logic. Centralising it creates a single point of control for retries, fallbacks, and rate limiting. |
-
-### Prompt Manager
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Owns the prompt template lifecycle. Stores versioned templates, renders them with context variables, and tracks which template version produced which output. |
-| **Owns** | `prompt_templates` table, template cache, render history |
-| **Why separate?** | Prompt engineering is iterative. Versioned templates enable A/B testing, rollback, and audit trails for generated content. |
-
-### Research Manager
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Gathers and synthesises technical research for a book topic. Queries the Provider Manager for content, organises findings into a structured corpus. |
-| **Owns** | `research_corpus` table, source references, key concepts |
-| **Why separate?** | Research is a distinct cognitive load from writing. Separating it allows different prompt strategies and quality checks for research vs. prose. |
-
-### Knowledge Manager
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | The RAG engine. Stores embeddings, manages vector indexes, and retrieves relevant context. Ensures cross-chapter consistency by surfacing related content during writing. |
-| **Owns** | Vector indexes, embedding cache, `embeddings` table |
-| **Why separate?** | RAG has unique infrastructure requirements (vector database, embedding models). Isolating it prevents those concerns from leaking into other subsystems. |
-
-### Outline Engine
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Generates a structured chapter-by-chapter outline from a book specification. Determines section depth, code example placement, and diagram insertion points. |
-| **Why separate?** | Outline generation has a distinct input (spec) and output (structured outline). Its logic is self-contained and benefits from isolated iteration. |
-
-### Writing Engine
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Generates chapter content. Iterates over the outline, queries the Provider Manager for prose, consults the Knowledge Manager for cross-references, and persists chapter content. |
-| **Why separate?** | The writing engine is the most complex subsystem. It coordinates prompts, knowledge, and provider access. Isolating it makes debugging and optimisation tractable. |
-
-### Review Engine
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Runs quality checks on generated content. Supports multiple review stages (technical, style, structural, consistency). Each stage produces a pass/fail verdict with findings. |
-| **Owns** | `review_reports` table, review stage definitions |
-| **Why separate?** | Review has a fundamentally different success criteria from generation. Combining them would couple "create content" with "judge content" — a conflated responsibility. |
-
-### Diagram Engine
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Generates diagrams from textual descriptions. Supports Mermaid and PlantUML output. Embeds diagram source and rendered output in chapter content. |
-| **Why separate?** | Diagram generation requires specialised prompt templates and rendering tooling (Mermaid CLI, PlantUML). Isolating it prevents diagram concerns from complicating the writing engine. |
-
-### Image Engine
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Generates and processes images. Queries image-capable LLM providers or dedicated image models. Handles resolution, format conversion, and placement. |
-| **Why separate?** | Image generation has unique latency, cost, and quality considerations. Separating it allows independent optimisation and provider selection. |
-
-### Markdown Engine
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Parses, normalises, lints, and formats markdown content. Enforces heading hierarchy, code block consistency, and cross-reference validity. Produces a publication-ready markdown artefact. |
-| **Why separate?** | Markdown processing is pure transformation — no LLM calls. It is fast, deterministic, and testable. Isolating it keeps it simple. |
-
-### Publishing Engine
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Compiles formatted markdown into publication formats (PDF, EPUB). Manages cover generation, table of contents, typography, and output file assembly. |
-| **Owns** | Output files in object storage |
-| **Why separate?** | Publishing is the terminal stage. It depends on every prior stage being complete and stable. Isolating it allows independent rendering infrastructure. |
-
-### Export Engine
-
-| Attribute | Value |
-|---|---|
-| **Purpose** | Handles all output delivery — file download, archive packaging, metadata generation. Supports multiple export targets (local filesystem, S3-compatible storage). |
-| **Why separate?** | Export concerns (compression, delivery, cleanup) are orthogonal to content generation. Separating them avoids entangling delivery logic with creation logic. |
-
----
-
 ## Provider Architecture
+
+### Provider Manager Implementation
+
+The Provider Manager is implemented in ``packages/llm/`` as a standalone Python package. It consists of:
+
+| Module | Responsibility |
+|---|---|
+| ``interfaces.py`` | ``LLMProvider`` ABC with 6 methods, ``Capability`` enum |
+| ``base.py`` | ``BaseProvider`` with defaults that raise ``ProviderError`` |
+| ``models.py`` | ``ChatConfig``, ``ChatResponse``, ``Chunk``, ``Embedding``, ``HealthStatus``, ``Message`` |
+| ``errors.py`` | ``ProviderError``, ``ProviderUnavailable``, ``AuthenticationError``, ``RateLimitError``, ``ProviderTimeout``, ``ConfigurationError``, ``InvalidProvider`` |
+| ``config.py`` | Pydantic ``BaseSettings`` classes: ``LLMSettings``, ``ProviderSettings`` |
+| ``config_loader.py`` | Assembles all sources into a ``RuntimeConfig`` dataclass |
+| ``registry.py`` | ``ProviderRegistry`` — register, get, list, unregister |
+| ``manager.py`` | ``ProviderManager`` — facade coordinating all subsystems |
+| ``router.py`` | ``ModelRouter`` — capability-based routing with fallback |
+| ``health.py`` | ``HealthChecker`` + ``HealthStatusCache`` — periodic health probes |
+| ``rate_limiter.py`` | ``RateLimiter`` ABC + ``TokenBucketRateLimiter`` |
+| ``retry.py`` | ``RetryPolicy`` + ``with_retry()`` async helper |
+| ``circuit_breaker.py`` | ``CircuitBreaker`` — CLOSED → OPEN → HALF_OPEN |
+| ``logging.py`` | Structured logging with trace IDs and subsystem tags |
+| ``providers/nvidia.py`` | NVIDIA NIM adapter — OpenAI-compatible API format |
+| ``providers/ollama.py`` | Ollama adapter — Ollama REST API format |
 
 ```mermaid
 graph TB
-    subgraph "Provider Manager"
-        REG[Provider Registry]
-        HC[Health Checker]
-        CB[Circuit Breaker]
-        SEL[Selector]
+    subgraph "ProviderManager Facade"
+        PM[ProviderManager]
     end
 
-    subgraph "Provider Adapters"
-        NIM[NVIDIA NIM Adapter]
-        OLL[Ollama Adapter]
-        PLG1[Future Provider 1]
-        PLG2[Future Provider 2]
+    subgraph "Routing & Protection"
+        RT[ModelRouter]
+        CB[CircuitBreaker]
+        RL[RateLimiter]
+        RP[RetryPolicy]
+        HC[HealthChecker]
     end
 
-    subgraph "Consumer Subsystems"
-        RM[Research Manager]
-        WE[Writing Engine]
-        RVE[Review Engine]
-        DE[Diagram Engine]
-        IE[Image Engine]
+    subgraph "Registry"
+        RG[ProviderRegistry]
     end
 
-    RM --> SEL
-    WE --> SEL
-    RVE --> SEL
-    DE --> SEL
-    IE --> SEL
-    SEL --> REG
-    REG --> NIM
-    REG --> OLL
-    REG -.-> PLG1
-    REG -.-> PLG2
-    HC --> NIM
-    HC --> OLL
-    CB --> NIM
-    CB --> OLL
-```
+    subgraph "Adapters"
+        NV[NvidiaProvider]
+        OL[OllamaProvider]
+    end
 
-### Provider Selection Strategy
+    subgraph "External"
+        NIM[NVIDIA NIM]
+        OLL[Ollama]
+    end
 
-```
-1. Consumer requests provider with capability (chat, embed, image)
-2. Selector checks configured primary provider (default: NVIDIA NIM)
-3. If primary is healthy → return primary adapter
-4. If primary is unhealthy or circuit broken → check fallback (Ollama)
-5. If fallback is healthy → return fallback adapter
-6. If fallback is unhealthy → raise ProviderUnavailable
-7. Selector caches selection for 60 seconds to reduce health-check load
+    PM --> RT
+    PM --> RP
+    RT --> RG
+    RT --> HC
+    RT --> CB
+    PM --> RL
+    RG --> NV
+    RG --> OL
+    HC --> NV
+    HC --> OL
+    CB --> NV
+    CB --> OL
+    RL --> NV
+    RL --> OL
+    NV --> NIM
+    OL --> OLL
 ```
 
 ### Provider Interface
 
-Every provider adapter exposes the same five methods:
+```python
+class LLMProvider(ABC):
+    @property
+    def name(self) -> str: ...
+    async def chat(self, messages, config) -> ChatResponse: ...
+    async def chat_stream(self, messages, config) -> AsyncIterator[Chunk]: ...
+    async def embed(self, texts, config) -> list[Embedding]: ...
+    async def embed_stream(self, texts) -> AsyncIterator[Embedding]: ...
+    async def health(self) -> HealthStatus: ...
+    async def list_models(self) -> list[str]: ...
+```
 
-| Method | Input | Output | Purpose |
-|---|---|---|---|
-| `chat()` | `list[Message]`, `ChatConfig` | `ChatResponse` | Text generation |
-| `chat_stream()` | `list[Message]`, `ChatConfig` | `AsyncIterator[Chunk]` | Streaming text generation |
-| `embed()` | `list[str]` | `list[Embedding]` | Text embedding |
-| `embed_stream()` | `AsyncIterator[str]` | `AsyncIterator[Embedding]` | Streaming embedding |
-| `health()` | — | `HealthStatus` | Provider health check |
+### Routing Strategy
+
+```
+1. Consumer calls ProviderManager.chat(messages)
+2. ProviderManager calls ModelRouter.route(Capability.CHAT)
+3. ModelRouter finds RoutingRule for CHAT capability
+4. Check primary (nvidia) circuit breaker: CLOSED?
+   - NO → skip to fallback
+5. Check primary health cache: HEALTHY?
+   - NO → skip to fallback
+6. Return primary provider
+7. If fallback needed: check fallback health
+   - HEALTHY → return fallback
+   - UNHEALTHY → raise ProviderUnavailable
+```
 
 ### Pluggability Contract
 
 A new provider is added in three steps:
 
-1. **Implement** the provider interface in a new adapter module
-2. **Register** the adapter in the provider registry (decorator or config entry)
+1. **Implement** ``LLMProvider`` in a new adapter module
+2. **Register** via ``ProviderRegistry.register(adapter)``
 3. **Configure** provider-specific environment variables
 
 No existing code changes. No recompilation. No subsystem modification.
@@ -397,61 +317,28 @@ graph TB
 | YAML config files | Medium | `config/providers.yaml` | Environment |
 | Database settings | Low | Feature flags | Runtime |
 
-### Configuration File Layout
+### LLM Environment Variables
 
-```
-config/
-├── defaults.yaml          # Ship with repo, safe defaults
-├── development.yaml       # Dev environment overrides
-├── production.yaml        # Production environment overrides
-├── providers.yaml         # Provider-specific configuration
-├── pipeline.yaml          # Pipeline stage configuration
-├── logging.yaml           # Logging levels and sinks
-└── features.yaml          # Feature flags
-```
-
-### Environment Variables
-
-| Variable | Description | Default |
+| Variable | Default | Description |
 |---|---|---|
-| `BOOKFORGE_ENV` | Runtime environment | `development` |
-| `BOOKFORGE_LOG_LEVEL` | Logging level | `INFO` |
-| `LLM_PROVIDER` | Active LLM provider | `nvidia` |
-| `LLM_FALLBACK_PROVIDER` | Fallback LLM provider | `ollama` |
-| `LLM_DEFAULT_MODEL` | Default model for chat | — |
-| `DATABASE_URL` | PostgreSQL connection string | — |
-| `REDIS_URL` | Redis connection string | — |
-| `STORAGE_BACKEND` | Storage backend type | `local` |
-| `STORAGE_PATH` | Local storage path | `./books` |
-| `S3_ENDPOINT` | S3-compatible endpoint | — |
-| `S3_BUCKET` | S3 bucket name | — |
-| `JOB_QUEUE_CONCURRENCY` | Worker concurrency | `4` |
-| `NVIDIA_NIM_API_KEY` | NVIDIA NIM API key | — |
-| `NVIDIA_NIM_BASE_URL` | NVIDIA NIM base URL | — |
-| `OLLAMA_BASE_URL` | Ollama base URL | `http://localhost:11434` |
-
-### Feature Flags
-
-| Flag | Type | Description |
-|---|---|---|
-| `pipeline.research.enabled` | boolean | Enable research stage |
-| `pipeline.review.enabled` | boolean | Enable review stage |
-| `pipeline.diagrams.enabled` | boolean | Enable diagram generation |
-| `pipeline.images.enabled` | boolean | Enable image generation |
-| `pipeline.epub.enabled` | boolean | Enable EPUB output |
-| `review.technical.enabled` | boolean | Enable technical review |
-| `review.style.enabled` | boolean | Enable style review |
-| `provider.fallback.enabled` | boolean | Enable provider fallback |
-
-### Future Secrets Management
-
-Secrets will be managed through an external secrets vault (HashiCorp Vault or AWS Secrets Manager) in production. The Configuration Manager will support a `vault:` URI scheme for secret references:
-
-```yaml
-provider:
-  nvidia:
-    api_key: vault://bookforge/nvidia/api_key
-```
+| `LLM_PROVIDER` | `nvidia` | Primary provider |
+| `LLM_FALLBACK_PROVIDER` | `ollama` | Fallback provider |
+| `LLM_DEFAULT_MODEL` | — | Default chat model |
+| `LLM_MAX_RETRIES` | `3` | Max retry attempts |
+| `LLM_RETRY_BACKOFF_FACTOR` | `2.0` | Exponential backoff multiplier |
+| `LLM_RETRY_MAX_DELAY` | `60.0` | Max backoff delay (seconds) |
+| `LLM_RETRY_JITTER` | `0.25` | Jitter fraction (±25%) |
+| `LLM_RATE_LIMIT_REQUESTS_PER_MINUTE` | `60` | Max requests/minute/provider |
+| `LLM_RATE_LIMIT_TOKENS_PER_MINUTE` | `100000` | Max tokens/minute/provider |
+| `LLM_HEALTH_CHECK_INTERVAL_SECONDS` | `60.0` | Health check interval |
+| `LLM_HEALTH_CHECK_TIMEOUT_SECONDS` | `10.0` | Health check timeout |
+| `LLM_CIRCUIT_BREAKER_THRESHOLD` | `5` | Failures before circuit opens |
+| `LLM_CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `300.0` | Cooldown before half-open |
+| `NVIDIA_NIM_API_KEY` | — | NVIDIA NIM key |
+| `NVIDIA_NIM_BASE_URL` | `http://localhost:8000` | NVIDIA NIM URL |
+| `NVIDIA_NIM_MODEL` | `meta/llama-3.1-70b-instruct` | Default NVIDIA model |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama URL |
+| `OLLAMA_MODEL` | `llama3.1` | Default Ollama model |
 
 ---
 
@@ -460,29 +347,31 @@ provider:
 ```mermaid
 flowchart TB
     FAIL[Operation Fails]
-    FAIL --> RETRY{Retry Allowed?}
-    RETRY -->|Yes| BACKOFF[Exponential Backoff]
-    BACKOFF --> ATTEMPT{Retry Limit<br/>Reached?}
+    FAIL --> RETRY{Retryable Error?}
+    RETRY -->|No| RAISE[Raise Immediately]
+    RETRY -->|Yes| BACKOFF[Exponential Backoff + Jitter]
+    BACKOFF --> ATTEMPT{Retries Exhausted?}
     ATTEMPT -->|No| RETRY_OP[Retry Operation]
     RETRY_OP --> FAIL
-    ATTEMPT -->|Yes| FALLBACK{Fallback<br/>Available?}
-    FALLBACK -->|Yes| SWITCH[Switch Provider]
-    SWITCH --> FAIL
-    FALLBACK -->|No| CIRCUIT[Open Circuit Breaker]
-    CIRCUIT --> FAILURE[Raise Failure Event]
-    FAILURE --> LOG[Log & Persist]
-    LOG --> RECOVER[Manual or Scheduled Recovery]
+    ATTEMPT -->|Yes| FALLBACK{Fallback Enabled?}
+    FALLBACK -->|Yes| SWITCH[Switch to Fallback Provider]
+    SWITCH --> FALLBACK_OP[Execute on Fallback]
+    FALLBACK_OP --> FALLBACK_OK{Success?}
+    FALLBACK_OK -->|Yes| DONE
+    FALLBACK_OK -->|No| OPEN[Open Circuit Breaker]
+    FALLBACK -->|No| OPEN
+    OPEN --> RAISE[Raise ProviderUnavailable]
 ```
 
 ### Retry Strategy
 
-| Failure Category | Max Retries | Backoff | Backoff Unit |
+| Failure Category | Max Retries | Backoff | Retryable |
 |---|---|---|---|
-| Network timeout | 3 | Exponential (2^N) | Seconds |
-| HTTP 429 (rate limit) | 5 | Linear (60s * N) | Seconds |
-| HTTP 5xx (server error) | 3 | Exponential (2^N) | Seconds |
-| Authentication failure | 0 | — | — |
-| Invalid request (4xx) | 0 | — | — |
+| Network timeout | 3 | Exponential (2^N) | Yes |
+| HTTP 429 (rate limit) | 5 | Linear (60s * N) | Yes |
+| HTTP 5xx (server error) | 3 | Exponential (2^N) | Yes |
+| Authentication failure | 0 | — | No |
+| Invalid request (4xx) | 0 | — | No |
 
 **Jitter:** Every retry delay is randomised by ±25% to prevent thundering herd.
 
@@ -490,97 +379,11 @@ flowchart TB
 
 ```
 1. Primary provider fails after exhausting retries
-2. Log the failure with full context
+2. Circuit breaker records failure (opens after threshold)
 3. Select fallback provider from configuration
 4. Execute operation on fallback provider
-5. Cache fallback decision for 300 seconds (avoids flip-flopping)
-6. If fallback also fails → raise ProviderUnavailable
+5. If fallback also fails → raise ProviderUnavailable
 ```
-
-### Provider Switching
-
-```mermaid
-sequenceDiagram
-    participant Sub as Subsystem
-    participant PM as Provider Manager
-    participant P1 as NVIDIA NIM
-    participant P2 as Ollama
-
-    Sub->>PM: generate(prompt)
-    PM->>P1: chat(messages)
-    P1-->>PM: HTTP 503
-    PM->>P1: chat(messages) [retry 1]
-    P1-->>PM: HTTP 503
-    PM->>P1: chat(messages) [retry 2]
-    P1-->>PM: HTTP 503
-    PM->>P1: chat(messages) [retry 3]
-    P1-->>PM: Timeout
-    PM->>LOG: Log provider failure
-    PM->>P2: chat(messages) [fallback]
-    P2-->>PM: ChatResponse
-    PM-->>Sub: ChatResponse
-```
-
-### Failure Recovery
-
-**Checkpointing:**
-- Every pipeline stage persists its output to the database before proceeding
-- A pipeline crash is detected by a missing "completed" event for the current stage
-- The orchestrator queries the last checkpoint and resumes from that stage
-
-**Recovery Flow:**
-
-1. Worker crashes mid-stage
-2. New worker picks up the job from the queue
-3. Orchestrator loads the pipeline context from the database
-4. Orchestrator detects the last completed stage
-5. Orchestrator resumes execution from the next incomplete stage
-
-### Logging Architecture
-
-```mermaid
-graph LR
-    SUB[Subsystem] --> LOG[Logging System]
-    LOG --> STDOUT[stdout<br/>JSON Lines]
-    LOG --> FILE[File<br/>Rotating]
-    LOG --> SENTRY[Sentry<br/>Errors Only]
-
-    subgraph "Log Levels"
-        DEBUG
-        INFO
-        WARN
-        ERROR
-        FATAL
-    end
-```
-
-**Log format:** Every log line is a JSON object with a consistent schema:
-
-```json
-{
-    "timestamp": "2026-07-26T14:30:00.123Z",
-    "level": "ERROR",
-    "logger": "bookforge.provider_manager",
-    "trace_id": "trc_abc123",
-    "subsystem": "provider_manager",
-    "event": "provider.fallback.activated",
-    "message": "NVIDIA NIM failed after 3 retries, falling back to Ollama",
-    "context": {
-        "primary_provider": "nvidia",
-        "fallback_provider": "ollama",
-        "retry_count": 3,
-        "failure_reason": "HTTP 503"
-    },
-    "duration_ms": 45200
-}
-```
-
-**Key logging principles:**
-- Every log line has a `trace_id` for end-to-end request tracing
-- Every log line identifies its `subsystem` and `event` name
-- Sensitive data (API keys, user content) is never logged
-- Error logs always include the failure context for debugging
-- Production logs are JSON for structured ingestion (ELK, Grafana Loki)
 
 ---
 
@@ -590,13 +393,11 @@ graph LR
 flowchart LR
     subgraph "Events"
         BC[book.created]
-        BS[book.state_changed]
         PL[pipeline.stage_started]
         PLS[pipeline.stage_completed]
         PLF[pipeline.stage_failed]
         PF[provider.failure]
         PS[provider.switch]
-        RV[review.verdict]
     end
 
     BC --> JQ[Job Queue]
@@ -608,207 +409,60 @@ flowchart LR
     PLF --> PF
     PF --> PS
     PS --> ORCH
-    ORCH --> BS
 ```
-
----
-
-## Storage Architecture
-
-```mermaid
-graph TB
-    subgraph "Storage Layer"
-        META[Metadata Store<br/>PostgreSQL]
-        CACHE[Cache Layer<br/>Redis]
-        OBJ[Object Store<br/>S3 / Local FS]
-    end
-
-    subgraph "Data by System"
-        META --> BOOKS[Book records]
-        META --> PROJS[Project records]
-        META --> CHAPS[Chapter content]
-        META --> CORPUS[Research corpus]
-        META --> REVIEWS[Review reports]
-        META --> TEMPLATES[Prompt templates]
-        META --> FEATURES[Feature flags]
-
-        CACHE --> EMBED[Embeddings]
-        CACHE --> PROVIDER[Provider health cache]
-        CACHE --> LOCKS[Distributed locks]
-
-        OBJ --> PDFS[PDF files]
-        OBJ --> EPUBS[EPUB files]
-        OBJ --> IMGS[Generated images]
-        OBJ --> DIAGS[Diagram assets]
-    end
-```
-
-| Store | Technology | Data | Retention |
-|---|---|---|---|
-| Metadata | PostgreSQL 16 | Books, projects, chapters, research, reviews, templates, events | Indefinite |
-| Cache | Redis 7 | Embeddings, provider health, rate limit counters, locks | Configurable TTL |
-| Objects | S3 / Local FS | PDFs, EPUBs, images, diagram assets | Until book archived |
-
----
-
-## Job Queue Architecture
-
-```mermaid
-graph TB
-    subgraph "Job Queue (Celery + Redis)"
-        BROKER[Redis Broker]
-        RESULT[Result Backend<br/>Redis]
-        WORKER[Celery Worker Pool]
-    end
-
-    subgraph "Task Types"
-        PIPE[pipeline.execute_stage]
-        RVW[review.run_stage]
-        EXP[export.deliver]
-    end
-
-    subgraph "Routing"
-        PIPE --> QUEUE1[pipeline queue<br/>concurrency: 2]
-        RVW --> QUEUE2[review queue<br/>concurrency: 1]
-        EXP --> QUEUE3[export queue<br/>concurrency: 2]
-    end
-
-    QUEUE1 --> WORKER
-    QUEUE2 --> WORKER
-    QUEUE3 --> WORKER
-```
-
-**Why Celery on Redis?**
-- Mature, well-documented, vast ecosystem
-- Native support for task routing, prioritisation, and rate limiting
-- Redis is already in the stack for caching — no additional infrastructure
-- Flower dashboard for monitoring (future dashboard integration)
 
 ---
 
 ## Sequence Diagrams
-
-### Full Book Creation Flow
-
-```mermaid
-sequenceDiagram
-    actor User
-    participant API as REST API
-    participant BM as Book Manager
-    participant JQ as Job Queue
-    participant ORCH as Pipeline Orchestrator
-    participant PRM as Provider Manager
-    participant NIM as NVIDIA NIM
-    participant KM as Knowledge Manager
-    participant PBE as Publishing Engine
-    participant S3 as Object Storage
-
-    User->>API: POST /books (spec)
-    API->>BM: create_book(spec)
-    BM->>BM: validate topic
-    BM->>BM: persist book record
-    BM-->>API: book_id
-    API-->>User: 201 Created
-
-    User->>API: POST /books/{id}/pipeline/start
-    API->>BM: transition_state(in_progress)
-    BM->>JQ: enqueue pipeline.start
-    API-->>User: 202 Accepted
-
-    JQ->>ORCH: execute pipeline.start
-    ORCH->>BM: load book spec
-
-    Note over ORCH: Stage: Validation
-    ORCH->>BM: validate specification
-    BM-->>ORCH: valid
-
-    Note over ORCH: Stage: Outline
-    ORCH->>PRM: generate(topic → outline)
-    PRM->>NIM: chat(messages)
-    NIM-->>PRM: ChatResponse
-    PRM-->>ORCH: outline
-    ORCH->>BM: persist outline
-
-    Note over ORCH: Stage: Research
-    ORCH->>PRM: generate(topic → research)
-    PRM->>NIM: chat(messages)
-    NIM-->>PRM: ChatResponse
-    PRM-->>ORCH: research corpus
-    ORCH->>KM: store_embeddings(corpus)
-    ORCH->>BM: persist research
-
-    Note over ORCH: Stage: Writing
-    loop Each Chapter
-        ORCH->>KM: retrieve_context(topic)
-        KM-->>ORCH: context
-        ORCH->>PRM: generate(chapter → content)
-        PRM->>NIM: chat(messages)
-        NIM-->>PRM: ChatResponse
-        PRM-->>ORCH: chapter content
-        ORCH->>BM: persist chapter
-    end
-
-    Note over ORCH: Stage: Review
-    ORCH->>PRM: review(chapter content)
-    PRM->>NIM: chat(messages)
-    NIM-->>PRM: review verdict
-    PRM-->>ORCH: review report
-    ORCH->>BM: persist review
-
-    Note over ORCH: Stage: Diagrams
-    ORCH->>PRM: generate(concept → diagram)
-    PRM->>NIM: chat(messages)
-    NIM-->>PRM: diagram description
-    PRM-->>ORCH: diagram source
-    ORCH->>BM: embed diagrams
-
-    Note over ORCH: Stage: Markdown
-    ORCH->>ORCH: format markdown
-    ORCH->>BM: persist formatted markdown
-
-    Note over ORCH: Stage: Publishing
-    ORCH->>PBE: compile(markdown → pdf)
-    PBE-->>ORCH: pdf artifact
-    ORCH->>S3: store pdf
-    ORCH->>PBE: compile(markdown → epub)
-    PBE-->>ORCH: epub artifact
-    ORCH->>S3: store epub
-
-    ORCH->>BM: transition_state(completed)
-    BM-->>User: Webhook / Poll: Book Complete
-```
 
 ### Provider Failure and Fallback
 
 ```mermaid
 sequenceDiagram
     participant Sub as Subsystem
-    participant PRM as Provider Manager
-    participant CB as Circuit Breaker
-    participant NIM as NVIDIA NIM
-    participant OLL as Ollama
+    participant PM as ProviderManager
+    participant RT as ModelRouter
+    participant CB as CircuitBreaker
+    participant RL as RateLimiter
+    participant NV as NVIDIA NIM
+    participant OL as Ollama
 
-    Sub->>PRM: generate(prompt)
-    PRM->>CB: is_open(nvidia)
-    CB-->>PRM: closed
-    PRM->>NIM: chat(messages)
-    NIM-->>PRM: HTTP 503
-    PRM->>PRM: retry 1 (backoff 2s)
-    PRM->>NIM: chat(messages)
-    NIM-->>PRM: HTTP 503
-    PRM->>PRM: retry 2 (backoff 4s)
-    PRM->>NIM: chat(messages)
-    NIM-->>PRM: HTTP 503
-    PRM->>PRM: retry 3 (backoff 8s)
-    PRM->>NIM: chat(messages)
-    NIM-->>PRM: Timeout
-    PRM->>CB: record_failure(nvidia)
+    Sub->>PM: chat(messages)
+    PM->>RT: route(CHAT)
+    RT->>CB: is_open(nvidia)
+    CB-->>RT: closed
+    RT->>RT: check health cache
+    RT-->>PM: RouteResult(provider=nvidia)
+
+    PM->>RL: acquire(nvidia)
+    RL-->>PM: 0ms wait
+
+    PM->>NV: chat(messages)
+    NV-->>PM: HTTP 503
+
+    PM->>PM: retry 1 (backoff 2s)
+    PM->>NV: chat(messages)
+    NV-->>PM: HTTP 503
+
+    PM->>PM: retry 2 (backoff 4s)
+    PM->>NV: chat(messages)
+    NV-->>PM: Timeout
+
+    PM->>PM: retry 3 (backoff 8s)
+    PM->>NV: chat(messages)
+    NV-->>PM: Timeout
+
+    PM->>CB: record_failure(nvidia)
     CB->>CB: open(nvidia, cooldown=300s)
-    PRM->>PRM: log failure event
-    PRM->>PRM: select fallback (ollama)
-    PRM->>OLL: chat(messages)
-    OLL-->>PRM: ChatResponse
-    PRM-->>Sub: ChatResponse
+
+    PM->>RT: route(CHAT) [fallback]
+    RT->>OL: check health
+    OL-->>RT: healthy
+    RT-->>PM: RouteResult(provider=ollama, fallback=true)
+
+    PM->>OL: chat(messages)
+    OL-->>PM: ChatResponse
+    PM-->>Sub: ChatResponse
 ```
 
 ---
@@ -817,34 +471,36 @@ sequenceDiagram
 
 ```mermaid
 graph TB
-    subgraph "Current (Phase 02)"
+    subgraph "Current (Phase 03)"
         MONO[Modular Monolith<br/>1 API + 1 Worker]
     end
 
-    subgraph "Phase 03 Evolution"
+    subgraph "Phase 04 Evolution"
         SPLIT[Domain Queues<br/>Separate Worker Pools]
     end
 
-    subgraph "Phase 04 Evolution"
+    subgraph "Phase 05 Evolution"
         MICRO[Domain Services<br/>Own DB per Service]
     end
 
     MONO --> SPLIT
     SPLIT --> MICRO
-
-    subgraph "Scaling Dimensions"
-        HORIZONTAL[Horizontal Worker Scaling]
-        VERTICAL[Specialised Instance Types<br/>GPU workers for generation<br/>CPU workers for formatting]
-        QUEUE_PRIORITY[Priority Queues<br/>Review > Export > Generation]
-    end
 ```
-
-**Scalability decisions and rationale:**
 
 | Decision | Rationale |
 |---|---|
 | Start as a modular monolith | Faster iteration, simpler deployment, no distributed debugging. The subsystem boundaries make extraction trivial later. |
-| Separate queues per workload | Pipeline stages have different latency and resource profiles. Generation is GPU-bound; formatting is CPU-bound; export is IO-bound. Separate queues allow independent scaling. |
-| Object storage for artifacts | PDFs and images are large binaries. Storing them in the database would bloat backups and slow queries. Object storage scales infinitely and cheaply. |
-| Stateless workers | Workers hold no state between jobs. Any worker can pick up any job. This enables horizontal scaling with zero coordination. |
-| Event-driven orchestration | Events decouple stage producers from stage consumers. A new stage can be inserted between existing stages without changing the orchestration code. |
+| Separate queues per workload | Pipeline stages have different latency and resource profiles. |
+| Stateless workers | Workers hold no state between jobs. Any worker can pick up any job. |
+| Event-driven orchestration | Events decouple stage producers from stage consumers. |
+
+## Architecture Decision Records
+
+| ID | Decision | Rationale |
+|---|---|---|
+| ADR-001 | ProviderManager as facade | All LLM access goes through a single entry point. Consistent retry, rate limiting, circuit breaking, and health checking without duplication across subsystems. |
+| ADR-002 | Token bucket rate limiter | Smooths burst traffic better than fixed-window counters. Allows short bursts up to capacity while enforcing long-term average. |
+| ADR-003 | Circuit breaker with half-open | Prevents cascading failures. Half-open state allows automatic recovery when the provider comes back. |
+| ADR-004 | Pydantic Settings for configuration | Type-safe configuration loading. Automatic .env file support. Clear validation errors on misconfiguration. |
+| ADR-005 | Provider adapters raise NotImplementedError for HTTP | Keeps the adapter layer pure — HTTP client injection is the integration boundary. Testable with mocks without real HTTP calls. |
+| ADR-006 | Routing rules as data, not code | Routing policy is a list of ``RoutingRule`` dataclasses. Changing provider priority is a configuration change, not a code change. |

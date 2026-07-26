@@ -9,12 +9,12 @@
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Subsystems](#subsystems)
+- [Provider Manager](#provider-manager)
 - [Project Structure](#project-structure)
 - [Tech Stack](#tech-stack)
 - [Quick Start](#quick-start)
 - [Documentation](#documentation)
 - [Pipeline](#pipeline)
-- [Provider Architecture](#provider-architecture)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
@@ -120,6 +120,33 @@ graph TB
 
 ---
 
+## Provider Manager
+
+The Provider Manager is implemented in ``packages/llm/`` and provides:
+
+- **``LLMProvider`` interface** — 6 methods: ``chat``, ``chat_stream``, ``embed``, ``embed_stream``, ``health``, ``list_models``
+- **``ProviderRegistry``** — Register, get, list, unregister providers by name
+- **``ModelRouter``** — Capability-based routing: primary → fallback → error
+- **``CircuitBreaker``** — Opens after N consecutive failures, cooldown then half-open
+- **``HealthChecker``** — Periodic health probes with TTL cache
+- **``TokenBucketRateLimiter``** — Smooths request rates per provider
+- **``RetryPolicy``** — Exponential backoff with ±25% jitter
+- **Providers** — NVIDIA NIM adapter (primary), Ollama adapter (fallback)
+
+```python
+from bookforge.llm import ProviderManager
+from bookforge.llm.models import Message, MessageRole
+
+manager = ProviderManager.from_env()
+await manager.start()
+response = await manager.chat([
+    Message(role=MessageRole.USER, content="Write a chapter...")
+])
+await manager.stop()
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -132,6 +159,25 @@ bookforge-ai/
 │   ├── core/             # Domain entities, pipeline orchestration
 │   ├── shared/           # Types, utilities, base classes
 │   ├── llm/              # Provider abstraction layer
+│   │   ├── src/bookforge/llm/
+│   │   │   ├── interfaces.py      # LLMProvider ABC
+│   │   │   ├── base.py            # BaseProvider
+│   │   │   ├── models.py          # Request/response types
+│   │   │   ├── errors.py          # Exception hierarchy
+│   │   │   ├── config.py          # Pydantic Settings
+│   │   │   ├── config_loader.py   # Config assembly
+│   │   │   ├── registry.py        # Provider registry
+│   │   │   ├── manager.py         # ProviderManager facade
+│   │   │   ├── router.py          # ModelRouter
+│   │   │   ├── health.py          # HealthChecker
+│   │   │   ├── rate_limiter.py    # Token bucket limiter
+│   │   │   ├── retry.py           # Retry policy
+│   │   │   ├── circuit_breaker.py # Circuit breaker
+│   │   │   ├── logging.py         # Structured logging
+│   │   │   └── providers/
+│   │   │       ├── nvidia.py      # NVIDIA NIM adapter
+│   │   │       └── ollama.py      # Ollama adapter
+│   │   └── tests/
 │   ├── research/         # Research and content gathering
 │   ├── markdown/         # Markdown processing
 │   ├── pdf/              # PDF compilation
@@ -140,14 +186,7 @@ bookforge-ai/
 │   ├── diagrams/         # Diagram generation
 │   ├── images/           # Image generation
 │   └── prompts/          # Prompt template management
-├── config/
-│   ├── defaults.yaml     # Default configuration
-│   ├── development.yaml  # Dev overrides
-│   ├── production.yaml   # Production overrides
-│   ├── providers.yaml    # Provider configuration
-│   ├── pipeline.yaml     # Pipeline stage configuration
-│   ├── logging.yaml      # Logging configuration
-│   └── features.yaml     # Feature flags
+├── config/               # YAML configuration files
 ├── docs/                 # Architecture and design documentation
 ├── templates/            # Book, chapter, and section templates
 ├── books/                # Generated book output
@@ -183,20 +222,11 @@ bookforge-ai/
 ## Quick Start
 
 ```bash
-# Clone the repository
 git clone https://github.com/your-org/bookforge-ai.git
 cd bookforge-ai
-
-# Copy environment configuration
 cp .env.example .env
-
-# Start infrastructure
 docker compose up -d postgres redis
-
-# Run migrations
 make migrate
-
-# Start development
 make dev
 ```
 
@@ -206,8 +236,8 @@ make dev
 
 | Document | Description |
 |---|---|
-| [Architecture](docs/ARCHITECTURE.md) | System architecture, subsystems, provider design, event flow |
-| [Pipeline](docs/PIPELINE.md) | Complete 13-stage book generation pipeline |
+| [Architecture](docs/ARCHITECTURE.md) | System architecture, subsystems, provider design |
+| [Pipeline](docs/PIPELINE.md) | 13-stage book generation pipeline |
 | [API](docs/API.md) | REST API endpoint catalog and contracts |
 | [Database](docs/DATABASE.md) | Schema design, ERD, migration strategy |
 | [Workflow](docs/WORKFLOW.md) | User-facing and system workflows |
@@ -229,8 +259,6 @@ Knowledge Base → Writing → Review → Diagrams → Cover →
 Markdown → PDF → EPUB → Completed Book
 ```
 
-13 stages across 4 phases. See [docs/PIPELINE.md](docs/PIPELINE.md) for details.
-
 ---
 
 ## Provider Architecture
@@ -240,7 +268,7 @@ Markdown → PDF → EPUB → Completed Book
 | Primary | NVIDIA NIM | Default LLM provider for all generation |
 | Fallback | Ollama | Local fallback when primary is unavailable |
 
-**Pluggable:** New providers implement a 5-method interface and register via configuration. No code changes required. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the provider architecture.
+**Pluggable:** New providers implement ``LLMProvider`` and register via ``ProviderRegistry.register()``.
 
 ---
 
@@ -250,15 +278,15 @@ Markdown → PDF → EPUB → Completed Book
 |---|---|
 | 01 — Foundation | Project structure, documentation, templates |
 | 02 — Architecture | System architecture, pipeline design, subsystem specification |
-| 03 — Core Pipeline | Research, writing, review, markdown, PDF |
-| 04 — Intelligence | LLM integration, RAG, diagrams, images |
+| 03 — Provider Manager | LLM abstraction layer, NVIDIA/Ollama adapters |
+| 04 — Core Pipeline | Research, writing, review, markdown, PDF |
 | 05 — Production | API, web UI, deployment, monitoring |
 
 ---
 
 ## Contributing
 
-Please read [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) and [docs/CODING_STANDARDS.md](docs/CODING_STANDARDS.md) before submitting contributions.
+Please read [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) and [docs/CODING_STANDARDS.md](docs/CODING_STANDARDS.md).
 
 ---
 
