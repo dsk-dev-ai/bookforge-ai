@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,3 +23,12 @@ class WriterSettings(BaseSettings):
     max_chunk_size_words: int = Field(default=2000, ge=500, le=10000, description="Max words per generation chunk")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="Default generation temperature")
     top_p: float = Field(default=0.95, ge=0.0, le=1.0, description="Default nucleus sampling top-p")
+
+    @model_validator(mode="after")
+    def _chunk_sizes_consistent(self) -> WriterSettings:
+        if self.min_chunk_size_words > self.max_chunk_size_words:
+            raise ValueError(
+                f"min_chunk_size_words ({self.min_chunk_size_words}) must not exceed "
+                f"max_chunk_size_words ({self.max_chunk_size_words})"
+            )
+        return self

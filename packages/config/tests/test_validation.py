@@ -5,6 +5,7 @@ from bookforge.config.application import ApplicationSettings, EnvironmentSetting
 from bookforge.config.enums import Environment
 from bookforge.config.providers import NvidiaSettings, OllamaSettings, ProviderSettings
 from bookforge.config.validator import assert_valid_config, validate_settings
+from bookforge.config.writer import WriterSettings
 from pydantic import ValidationError
 
 
@@ -14,6 +15,8 @@ class TestApplicationSettings:
         assert settings.host == "0.0.0.0"
         assert settings.port == 8000
         assert settings.workers == 4
+        assert settings.name == "bookforge"
+        assert settings.version == "1.0.0"
 
     def test_invalid_port_raises(self) -> None:
         with pytest.raises(ValidationError):
@@ -36,42 +39,40 @@ class TestEnvironmentSettings:
     def test_defaults(self) -> None:
         settings = EnvironmentSettings()
         assert settings.env == Environment.DEVELOPMENT
-        assert settings.debug is True
 
     def test_custom_env(self) -> None:
-        settings = EnvironmentSettings(env=Environment.PRODUCTION, debug=False)
+        settings = EnvironmentSettings(env=Environment.PRODUCTION)
         assert settings.env == Environment.PRODUCTION
-        assert settings.debug is False
 
 
 class TestNvidiaSettings:
     def test_defaults(self) -> None:
         settings = NvidiaSettings()
-        assert settings.nvidia_nim_base_url == "http://localhost:8000"
-        assert settings.nvidia_nim_max_retries == 3
+        assert settings.nim_base_url == "http://localhost:8000"
+        assert settings.nim_max_retries == 3
 
     def test_timeout_too_low_raises(self) -> None:
         with pytest.raises(ValidationError):
-            NvidiaSettings(nvidia_nim_timeout_seconds=0.5)
+            NvidiaSettings(nim_timeout_seconds=0.5)
 
     def test_timeout_too_high_raises(self) -> None:
         with pytest.raises(ValidationError):
-            NvidiaSettings(nvidia_nim_timeout_seconds=700.0)
+            NvidiaSettings(nim_timeout_seconds=700.0)
 
     def test_negative_max_retries_raises(self) -> None:
         with pytest.raises(ValidationError):
-            NvidiaSettings(nvidia_nim_max_retries=-1)
+            NvidiaSettings(nim_max_retries=-1)
 
 
 class TestOllamaSettings:
     def test_defaults(self) -> None:
         settings = OllamaSettings()
-        assert settings.ollama_base_url == "http://localhost:11434"
-        assert settings.ollama_model == "llama3.1"
+        assert settings.base_url == "http://localhost:11434"
+        assert settings.model == "llama3.1"
 
     def test_base_url_strips_trailing_slash(self) -> None:
-        settings = OllamaSettings(ollama_base_url="http://localhost:11434/")
-        assert settings.ollama_base_url == "http://localhost:11434"
+        settings = OllamaSettings(base_url="http://localhost:11434/")
+        assert settings.base_url == "http://localhost:11434"
 
 
 class TestProviderSettings:
@@ -92,6 +93,12 @@ class TestProviderSettings:
     def test_threshold_minimum(self) -> None:
         with pytest.raises(ValidationError):
             ProviderSettings(circuit_breaker_threshold=0)
+
+
+class TestWriterSettings:
+    def test_min_chunk_not_exceed_max(self) -> None:
+        with pytest.raises(ValidationError):
+            WriterSettings(min_chunk_size_words=3000, max_chunk_size_words=1000)
 
 
 class TestValidator:

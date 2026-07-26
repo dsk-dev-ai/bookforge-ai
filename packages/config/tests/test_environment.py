@@ -1,60 +1,63 @@
 """Tests for environment detection."""
 
-import os
 
+import pytest
 from bookforge.config.enums import Environment
 from bookforge.config.environment import EnvironmentDetector, get_environment
 
 
+def _clear_get_environment_cache() -> None:
+    get_environment.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache() -> None:
+    _clear_get_environment_cache()
+
+
 class TestEnvironmentDetector:
-    def test_default_is_development(self) -> None:
+    def test_default_is_development(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("BOOKFORGE_ENV", raising=False)
+        monkeypatch.delenv("APP_ENV", raising=False)
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
         detector = EnvironmentDetector()
-        for var in ("BOOKFORGE_ENV", "APP_ENV", "ENVIRONMENT"):
-            os.environ.pop(var, None)
         assert detector.detect() == Environment.DEVELOPMENT
 
-    def test_bookforge_env(self) -> None:
+    def test_bookforge_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BOOKFORGE_ENV", "production")
         detector = EnvironmentDetector()
-        os.environ["BOOKFORGE_ENV"] = "production"
         assert detector.detect() == Environment.PRODUCTION
-        os.environ.pop("BOOKFORGE_ENV", None)
 
-    def test_app_env_fallback(self) -> None:
+    def test_app_env_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_ENV", "staging")
         detector = EnvironmentDetector()
-        os.environ["APP_ENV"] = "staging"
         assert detector.detect() == Environment.STAGING
-        os.environ.pop("APP_ENV", None)
 
-    def test_environment_variable(self) -> None:
+    def test_environment_variable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ENVIRONMENT", "testing")
         detector = EnvironmentDetector()
-        os.environ["ENVIRONMENT"] = "testing"
         assert detector.detect() == Environment.TESTING
-        os.environ.pop("ENVIRONMENT", None)
 
-    def test_is_production(self) -> None:
+    def test_is_production(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BOOKFORGE_ENV", "production")
         detector = EnvironmentDetector()
-        os.environ["BOOKFORGE_ENV"] = "production"
         assert detector.is_production() is True
         assert detector.is_development() is False
-        os.environ.pop("BOOKFORGE_ENV", None)
 
     def test_is_development(self) -> None:
         detector = EnvironmentDetector()
         assert detector.is_development() is True
 
-    def test_invalid_env_falls_back(self) -> None:
+    def test_invalid_env_falls_back(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BOOKFORGE_ENV", "invalid")
         detector = EnvironmentDetector()
-        os.environ["BOOKFORGE_ENV"] = "invalid"
         assert detector.detect() == Environment.DEVELOPMENT
-        os.environ.pop("BOOKFORGE_ENV", None)
 
-    def test_precedence_bookforge_env_wins(self) -> None:
+    def test_precedence_bookforge_env_wins(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BOOKFORGE_ENV", "production")
+        monkeypatch.setenv("ENVIRONMENT", "development")
         detector = EnvironmentDetector()
-        os.environ["BOOKFORGE_ENV"] = "production"
-        os.environ["ENVIRONMENT"] = "development"
         assert detector.detect() == Environment.PRODUCTION
-        os.environ.pop("BOOKFORGE_ENV", None)
-        os.environ.pop("ENVIRONMENT", None)
 
 
 class TestGetEnvironment:

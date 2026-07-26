@@ -16,7 +16,7 @@ host = config.application.host
 port = config.application.port
 log_level = config.logging.level
 db_url = config.storage.local_path
-nvidia_model = config.nvidia.nvidia_nim_model
+nvidia_model = config.nvidia.nim_model
 research_enabled = config.features.research_enabled
 
 # Detect environment
@@ -29,7 +29,7 @@ if env == Environment.PRODUCTION:
 
 | Group | Class | Env Prefix | Description |
 |---|---|---|---|
-| Environment | `EnvironmentSettings` | `BOOKFORGE_` | Runtime environment, debug mode, app name/version |
+| Environment | `EnvironmentSettings` | `BOOKFORGE_` | Runtime environment detection |
 | Application | `ApplicationSettings` | `BOOKFORGE_APP_` | Host, port, workers, CORS, rate limits |
 | Feature Flags | `FeatureFlags` | `BOOKFORGE_FEATURE_` | Enable/disable subsystems and experiments |
 | Provider | `ProviderSettings` | `BOOKFORGE_PROVIDER_` | Provider routing, retry, circuit breaker, health |
@@ -90,6 +90,7 @@ Settings are loaded from:
 ```text
 # .env
 BOOKFORGE_ENV=production
+BOOKFORGE_APP_NAME=bookforge
 BOOKFORGE_APP_PORT=8080
 BOOKFORGE_FEATURE_EXPERIMENTAL_ENABLED=true
 NVIDIA_NIM_API_KEY=nvapi-abc123

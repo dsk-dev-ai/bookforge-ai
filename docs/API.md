@@ -249,11 +249,11 @@ Configuration is managed by ``packages/config/``. All settings are loaded from e
 
 ### Get All Config
 
-```
+```text
 GET /system/config
 ```
 
-Returns the entire ``BookForgeConfig`` object (redacting secrets):
+Returns the entire ``BookForgeConfig`` object (``SecretStr`` fields are masked):
 
 ```json
 {
@@ -274,11 +274,13 @@ Returns the entire ``BookForgeConfig`` object (redacting secrets):
             "writer_enabled": true,
             "publishing_enabled": true,
             "dashboard_enabled": true,
-            "experimental_enabled": false
+            "experimental_enabled": false,
+            "fallback_enabled": true,
+            "telemetry_enabled": false
         },
         "nvidia": {
-            "nvidia_nim_base_url": "http://localhost:8000",
-            "nvidia_nim_model": "meta/llama-3.1-70b-instruct"
+            "nim_base_url": "http://localhost:8000",
+            "nim_model": "meta/llama-3.1-70b-instruct"
         },
         "ollama": {
             "base_url": "http://localhost:11434",
@@ -290,13 +292,13 @@ Returns the entire ``BookForgeConfig`` object (redacting secrets):
 
 ### List Feature Flags
 
-```
+```text
 GET /system/config/features
 ```
 
 ### Update Feature Flag
 
-```
+```text
 PATCH /system/config/features/{flag_name}
 ```
 

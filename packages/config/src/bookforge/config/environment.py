@@ -5,6 +5,7 @@ from functools import lru_cache
 from typing import ClassVar
 
 from bookforge.config.enums import Environment
+from dotenv import dotenv_values
 
 
 class EnvironmentDetector:
@@ -22,8 +23,9 @@ class EnvironmentDetector:
         Checks ``BOOKFORGE_ENV``, then ``APP_ENV``, then ``ENVIRONMENT``.
         Falls back to ``development``.
         """
+        _env = dotenv_values(".env")
         for var in self.DETECTION_VARS:
-            raw = os.environ.get(var)
+            raw = os.environ.get(var) or _env.get(var)
             if raw is not None:
                 try:
                     return Environment(raw.lower())

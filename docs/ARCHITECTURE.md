@@ -359,11 +359,16 @@ graph TB
 
 ### Environment Variables by Settings Group
 
-**Application & Environment** — ``BOOKFORGE_`` prefix:
+**Environment** — ``BOOKFORGE_`` prefix:
 
 | Variable | Default | Description |
 |---|---|---|
 | ``BOOKFORGE_ENV`` | ``development`` | Runtime environment |
+
+**Application** — ``BOOKFORGE_APP_`` prefix:
+
+| Variable | Default | Description |
+|---|---|---|
 | ``BOOKFORGE_APP_NAME`` | ``bookforge`` | Application name |
 | ``BOOKFORGE_APP_VERSION`` | ``1.0.0`` | Application version |
 | ``BOOKFORGE_APP_DEBUG`` | ``true`` | Debug mode (auto-adjusted for prod) |
@@ -397,6 +402,8 @@ graph TB
 | ``BOOKFORGE_FEATURE_PUBLISHING_ENABLED`` | ``true`` | Enable publishing engine |
 | ``BOOKFORGE_FEATURE_DASHBOARD_ENABLED`` | ``true`` | Enable web dashboard |
 | ``BOOKFORGE_FEATURE_EXPERIMENTAL_ENABLED`` | ``false`` | Enable experimental features |
+| ``BOOKFORGE_FEATURE_FALLBACK_ENABLED`` | ``true`` | Enable provider fallback |
+| ``BOOKFORGE_FEATURE_TELEMETRY_ENABLED`` | ``false`` | Enable anonymous telemetry |
 
 **Other settings groups** — each with its own prefix:
 
@@ -417,11 +424,12 @@ from bookforge.config import load_config, Environment
 
 config = load_config()
 
-host = config.application.host       # ApplicationSettings
+host = config.application.host             # ApplicationSettings
 port = config.application.port
-env = config.environment.env         # Environment.DEVELOPMENT
-nvidia_key = config.nvidia.api_key   # NvidiaSettings
-feature = config.features.nvidia_enabled  # FeatureFlags
+name = config.application.name             # BOOKFORGE_APP_NAME
+env = config.environment.env               # Environment.DEVELOPMENT
+nvidia_key = config.nvidia.nim_api_key     # NvidiaSettings
+feature = config.features.nvidia_enabled   # FeatureFlags
 ```
 
 ### Environment Detection
