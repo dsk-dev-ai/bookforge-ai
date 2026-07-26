@@ -245,6 +245,49 @@ Proxies to ``LLMProvider.list_models()``.
 
 ## Configuration Endpoints
 
+Configuration is managed by ``packages/config/``. All settings are loaded from environment variables and ``.env`` files via Pydantic v2.
+
+### Get All Config
+
+```
+GET /system/config
+```
+
+Returns the entire ``BookForgeConfig`` object (redacting secrets):
+
+```json
+{
+    "data": {
+        "application": {
+            "name": "bookforge",
+            "version": "1.0.0",
+            "debug": false,
+            "host": "0.0.0.0",
+            "port": 8000,
+            "workers": 4
+        },
+        "environment": { "env": "production" },
+        "features": {
+            "nvidia_enabled": true,
+            "ollama_enabled": true,
+            "research_enabled": true,
+            "writer_enabled": true,
+            "publishing_enabled": true,
+            "dashboard_enabled": true,
+            "experimental_enabled": false
+        },
+        "nvidia": {
+            "nvidia_nim_base_url": "http://localhost:8000",
+            "nvidia_nim_model": "meta/llama-3.1-70b-instruct"
+        },
+        "ollama": {
+            "base_url": "http://localhost:11434",
+            "model": "llama3.1"
+        }
+    }
+}
+```
+
 ### List Feature Flags
 
 ```
@@ -261,11 +304,19 @@ PATCH /system/config/features/{flag_name}
 { "enabled": true }
 ```
 
-Provider-specific flags:
+All feature flags are defined in ``packages/config/src/bookforge/config/features.py``:
 
-| Flag | Description |
+| Flag Env Variable | Description |
 |---|---|
-| `provider.fallback.enabled` | Enable provider fallback on failure |
+| ``BOOKFORGE_FEATURE_NVIDIA_ENABLED`` | Enable NVIDIA provider |
+| ``BOOKFORGE_FEATURE_OLLAMA_ENABLED`` | Enable Ollama provider |
+| ``BOOKFORGE_FEATURE_RESEARCH_ENABLED`` | Enable research engine |
+| ``BOOKFORGE_FEATURE_WRITER_ENABLED`` | Enable writing engine |
+| ``BOOKFORGE_FEATURE_PUBLISHING_ENABLED`` | Enable publishing engine |
+| ``BOOKFORGE_FEATURE_DASHBOARD_ENABLED`` | Enable web dashboard |
+| ``BOOKFORGE_FEATURE_EXPERIMENTAL_ENABLED`` | Enable experimental features |
+| ``BOOKFORGE_FEATURE_FALLBACK_ENABLED`` | Enable provider fallback |
+| ``BOOKFORGE_FEATURE_TELEMETRY_ENABLED`` | Enable anonymous telemetry |
 
 ---
 
@@ -322,14 +373,20 @@ GET /system/ready
 
 ## API Configuration
 
-```yaml
-api:
-  host: "0.0.0.0"
-  port: 8000
-  rate_limit:
-    requests_per_minute: 100
-    burst: 20
-  pagination:
-    default_limit: 20
-    max_limit: 100
+All API settings are managed through the configuration package (``packages/config/``):
+
+```python
+from bookforge.config import load_config
+
+config = load_config()
+api_host = config.application.host       # BOOKFORGE_APP_HOST
+api_port = config.application.port       # BOOKFORGE_APP_PORT
+```
+
+```text
+# .env
+BOOKFORGE_APP_HOST=0.0.0.0
+BOOKFORGE_APP_PORT=8000
+BOOKFORGE_SECURITY_RATE_LIMIT_ENABLED=true
+BOOKFORGE_SECURITY_RATE_LIMIT_REQUESTS=100
 ```
