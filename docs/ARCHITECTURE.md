@@ -13,6 +13,7 @@
 - [Provider Architecture](#provider-architecture)
 - [Provider Manager Implementation](#provider-manager-implementation)
 - [Configuration Architecture](#configuration-architecture)
+- [Research Architecture](#research-architecture)
 - [Error Handling Architecture](#error-handling-architecture)
 - [Event Flow](#event-flow)
 - [Storage Architecture](#storage-architecture)
@@ -443,6 +444,136 @@ detector = EnvironmentDetector()
 env = detector.detect()                     # Environment enum
 env = get_environment()                     # cached singleton
 ```
+
+---
+
+## Research Architecture
+
+The Research Engine is implemented in ``packages/research/`` as a standalone Python package. It gathers, organizes, validates, and prepares technical knowledge before book writing. The engine operates independently of any specific LLM provider — all pipeline stages use rule-based heuristics.
+
+### Module Map
+
+| Module | Responsibility |
+|---|---|
+| ``enums.py`` | ``SourceType``, ``ResearchStatus``, ``RankCriterion``, ``SupportedInput`` |
+| ``models.py`` | ``ResearchSource``, ``ResearchDocument``, ``ResearchSection``, ``ResearchPlan``, ``ResearchResult``, ``ResearchJob``, ``ResearchTask``, ``ResearchStatistics``, and sub-models (``KeyConcept``, ``Terminology``, ``CodeReference``, etc.) |
+| ``cache.py`` | ``MemoryCache``, ``DiskCache`` — TTL-based caching for results and jobs |
+| ``planner.py`` | ``ResearchPlanner`` — generates objectives, queries, and target source types from a topic |
+| ``normalizer.py`` | ``ResearchNormalizer`` — extracts sections, cleans content, normalizes sources |
+| ``deduplicator.py`` | ``ResearchDeduplicator`` — content fingerprinting via SHA-256 |
+| ``ranker.py`` | ``ResearchRanker`` — rule-based scoring by authority, freshness, relevance, completeness |
+| ``validator.py`` | ``ResearchValidator`` — checks duplicate sources, invalid URLs, missing metadata, empty summaries |
+| ``exporter.py`` | ``ResearchExporter`` — dict, JSON, and summary representations of results |
+| ``pipeline.py`` | ``ResearchPipeline`` — orchestrates the 6-stage pipeline in order |
+| ``manager.py`` | ``ResearchManager`` — job lifecycle: create, start, cancel, list, track |
+| ``engine.py`` | ``ResearchEngine`` — top-level entry point: ``engine.research(topic)`` |
+
+### Pipeline
+
+```mermaid
+graph TB
+    TOPIC[Topic] --> PLAN[Planning]
+    PLAN --> NORM[Normalization]
+    NORM --> DEDUP[Deduplication]
+    DEDUP --> RANK[Ranking]
+    RANK --> VAL[Validation]
+    VAL --> EXPORT[Export]
+    EXPORT --> RESULT[ResearchResult]
+
+    PLAN --> |ResearchPlanner| PLAN_BOX[Objectives, Queries, Sources]
+    NORM --> |ResearchNormalizer| NORM_BOX[Sections, Clean Content]
+    DEDUP --> |ResearchDeduplicator| DEDUP_BOX[SHA-256 Fingerprints]
+    RANK --> |ResearchRanker| RANK_BOX[Authority, Freshness, Relevance, Completeness]
+    VAL --> |ResearchValidator| VAL_BOX[URLs, Duplicates, Metadata]
+    EXPORT --> |ResearchExporter| EXPORT_BOX[Dict, JSON, Summary]
+```
+
+### Research Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant Engine as ResearchEngine
+    participant Mgr as ResearchManager
+    participant Pipe as ResearchPipeline
+    participant Cache as ResearchCache
+
+    App->>Engine: research(topic)
+    Engine->>Cache: check cache
+    alt Cache hit
+        Cache-->>Engine: cached result
+        Engine-->>App: ResearchResult
+    else Cache miss
+        Engine->>Mgr: create_job(topic)
+        Mgr-->>Engine: job
+        Engine->>Mgr: start_job(job_id)
+        Mgr->>Pipe: run(job)
+        Pipe->>Pipe: plan → normalize → dedupe → rank → validate → export
+        Pipe-->>Mgr: completed job
+        Mgr-->>Engine: completed job
+        Engine->>Cache: set result
+        Engine-->>App: ResearchResult
+    end
+```
+
+### Ranking Criteria
+
+| Criterion | Weight | Implementation |
+|---|---|---|
+| Authority | 0.35 | Source type hierarchy: Specification > RFC > Book > Paper > Documentation > API > GitHub > Blog |
+| Freshness | 0.20 | Source type decay rate (blogs decay fastest, books slowest) |
+| Relevance | 0.30 | Keyword overlap between topic and title/content |
+| Completeness | 0.15 | Title presence, content length, URL presence |
+
+### Supported Inputs
+
+All ``SupportedInput`` enum values have tailored source type mappings and query generation strategies:
+
+| Input Type | Primary Sources | Example |
+|---|---|---|
+| ``TECHNICAL_TOPIC`` | Documentation, Blog, Book, Paper | "Kubernetes networking" |
+| ``PROGRAMMING_LANGUAGE`` | Documentation, Specification, Book, Blog | "Rust" |
+| ``FRAMEWORK`` | Documentation, GitHub, Blog, API | "React" |
+| ``TECHNOLOGY`` | Documentation, RFC, Paper, Blog | "WebAssembly" |
+| ``SOFTWARE_LIBRARY`` | Documentation, GitHub, API, Blog | "pandas" |
+| ``API`` | API docs, Documentation, Specification, Blog | "REST API" |
+| ``RFC`` | RFC, Documentation, Blog, Paper | "HTTP/3" |
+| ``ARCHITECTURE`` | Book, Paper, Blog, Documentation | "Microservices" |
+
+### Usage
+
+```python
+from bookforge.research import ResearchEngine, ResearchSource
+from bookforge.research.enums import SourceType
+
+engine = ResearchEngine()
+
+# Full pipeline from topic
+result = engine.research("Kubernetes networking")
+print(result.summary)
+for concept in result.key_concepts:
+    print(f"  {concept.name}: {concept.definition}")
+
+# With pre-collected sources
+sources = [
+    ResearchSource(
+        id="k8s-net",
+        title="Kubernetes Networking",
+        source_type=SourceType.DOCUMENTATION,
+        content="Documentation content...",
+    ),
+]
+result = engine.research_with_sources("Kubernetes", sources)
+```
+
+### Architecture Decision Records
+
+| ID | Decision | Rationale |
+|---|---|---|
+| ADR-014 | Rule-based pipeline stages | No external LLM dependency for research planning, normalization, deduplication, ranking, or validation. All stages use deterministic heuristics, making the engine testable and predictable. |
+| ADR-015 | Content fingerprinting for deduplication | SHA-256 of title + content prefix. Deterministic, no state needed, no cross-source comparison overhead — each source is hashed independently. |
+| ADR-016 | ``StrEnum`` for all research enums | ``StrEnum`` (Python 3.11+) ensures enum values are strings, enabling direct serialization to JSON and comparison with raw string values. |
+| ADR-017 | Cache-aside pattern with TTL | Both ``MemoryCache`` and ``DiskCache`` follow the same ``ResearchCache`` ABC. TTL-based expiry avoids stale results without active eviction threads. |
 
 ---
 
