@@ -275,12 +275,13 @@ Markdown → PDF → EPUB → Completed Book
 ## Roadmap
 
 | Phase | Focus |
-|---|---|
+|---|---|---|
 | 01 — Foundation | Project structure, documentation, templates |
 | 02 — Architecture | System architecture, pipeline design, subsystem specification |
 | 03 — Provider Manager | LLM abstraction layer, NVIDIA/Ollama adapters |
-| 04 — Core Pipeline | Research, writing, review, markdown, PDF |
-| 05 — Production | API, web UI, deployment, monitoring |
+| 04 — Core Domain | Domain entities, value objects, enums, serialization |
+| 05 — Core Pipeline | Research, writing, review, markdown, PDF |
+| 06 — Production | API, web UI, deployment, monitoring |
 
 ---
 
