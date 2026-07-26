@@ -14,6 +14,7 @@
 - [Provider Manager Implementation](#provider-manager-implementation)
 - [Configuration Architecture](#configuration-architecture)
 - [Research Architecture](#research-architecture)
+- [Book Planning Architecture](#book-planning-architecture)
 - [Error Handling Architecture](#error-handling-architecture)
 - [Event Flow](#event-flow)
 - [Storage Architecture](#storage-architecture)
@@ -576,6 +577,62 @@ result = engine.research_with_sources("Kubernetes", sources)
 | ADR-017 | Cache-aside pattern with TTL | Both ``MemoryCache`` and ``DiskCache`` follow the same ``ResearchCache`` ABC. TTL-based expiry avoids stale results without active eviction threads. |
 
 ---
+
+## Book Planning Architecture
+
+The `packages/planner` subsystem transforms structured research into a complete
+technical book blueprint. It is a pure rule-based engine — no LLM calls, no
+external APIs, no writing.
+
+### Components
+
+| Component | Package | Responsibility |
+|---|---|---|
+| `PlannerEngine` | `bookforge.planner.engine` | Facade — single entry point for all planning |
+| `PlannerManager` | `bookforge.planner.manager` | Blueprint lifecycle (CRUD + planning) |
+| `BookPlanner` | `bookforge.planner.planner` | Applies strategy chain to a blueprint |
+| `OutlineValidator` | `bookforge.planner.validator` | Structural validation (duplicates, cycles, prerequisites) |
+| `OutlineExporter` | `bookforge.planner.exporter` | Serialises blueprints to dict / JSON / YAML |
+| `SequenceOptimizer` | `bookforge.planner.optimizer` | Prerequisite-aware chapter ordering |
+| `AudienceAnalyzer` | `bookforge.planner.estimators` | Audience-level scoring from difficulty |
+
+### Planning Pipeline
+
+```
+Blueprint (topic + chapter titles)
+    │
+    ▼
+BookPlanner.generate_outline()  ──→  BookOutline (front matter, chapters, back matter)
+    │
+    ▼
+BookPlanner.create_blueprint()  ──→  BookBlueprint (outline + estimates)
+    │
+    ▼
+Strategies (chain of responsibility):
+  • ProgressiveLearningStrategy   — topological sort + learning path
+  • DependencyOrderedStrategy     — graph-based ordering
+  • DifficultyProgressionStrategy — easy → hard
+  • TopicClusteringStrategy       — group by topic area
+    │
+    ▼
+SequenceOptimizer.optimize()     ──→  final chapter order + LearningPath
+    │
+    ▼
+OutlineValidator.validate()      ──→  ValidationMessage list
+    │
+    ▼
+OutlineExporter.{to_dict,to_json,to_yaml}()
+```
+
+### Key Design Decisions
+
+1. **No LLM dependency** — the planner is deterministic. All chapter content
+   fields are empty placeholders filled later by the Writing Engine.
+2. **Dependency graph as source of truth** — chapter ordering is derived from
+   the graph rather than from user-specified order.
+3. **Strategy pattern** — planning strategies are composable and swappable.
+4. **Validation-first** — blueprints are validated before export; errors are
+   collected, not raised, to give a full picture of issues.
 
 ## Error Handling Architecture
 
