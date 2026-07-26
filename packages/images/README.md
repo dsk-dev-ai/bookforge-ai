@@ -1,16 +1,29 @@
 # `@bookforge/images`
 
-Image generation and processing engine.
+Image Engine subsystem — cover and illustration image generation.
 
 ## Responsibilities
 
-- Generates illustrations and diagrams via image-capable LLM providers
-- Processes and optimises generated images for PDF output
-- Manages image resolution, format, and placement in content
+- Generates book cover images from metadata via image-capable providers
+- Generates illustrations for chapter content
+- Processes and optimises images (resize, crop, format conversion)
+- Manages image resolution and placement in content
+- Stores image assets in object storage
 - Supports multiple image generation backends
-- Handles image attribution and metadata
+- Part of the **Creation** phase of the pipeline (Stage 9)
+
+## Pipeline Stages
+
+| Stage | Role |
+|---|---|
+| Stage 9: Cover | Generate book cover image |
 
 ## Dependencies
 
-- `llm` — Image generation via LLM providers
-- `shared` — Types, configuration, utilities
+- `llm` — Image generation via Provider Manager
+- `shared` — Types, configuration
+
+## Referenced In
+
+- `docs/PIPELINE.md` — Stage 9
+- `docs/ARCHITECTURE.md` — Image Engine subsystem

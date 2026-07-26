@@ -1,17 +1,33 @@
 # `@bookforge/diagrams`
 
-Automated diagram generation engine.
+Diagram Engine subsystem — automated diagram generation.
 
 ## Responsibilities
 
 - Generates architecture diagrams from textual descriptions
 - Supports Mermaid and PlantUML output formats
-- Places diagrams at appropriate points in chapter content
-- Produces diagram descriptions and captions
-- Manages diagram rendering and image asset storage
-- Supports multiple diagram types (flowchart, sequence, ERD, component)
+- Scans chapter content for diagram insertion points
+- Generates diagram descriptions via the Provider Manager
+- Renders diagram source to image assets
+- Embeds diagram references in chapter content
+- Part of the **Creation** phase of the pipeline (Stage 8)
+
+## Supported Diagram Types
+
+flowchart, sequence diagram, class diagram, ERD, component diagram, state diagram, Gantt chart
+
+## Pipeline Stages
+
+| Stage | Role |
+|---|---|
+| Stage 8: Diagrams | Generate diagram definitions and assets |
 
 ## Dependencies
 
-- `llm` — Diagram description generation via LLM providers
-- `shared` — Types, configuration, utilities
+- `llm` — Diagram description generation via Provider Manager
+- `shared` — Types, configuration
+
+## Referenced In
+
+- `docs/PIPELINE.md` — Stage 8
+- `docs/ARCHITECTURE.md` — Diagram Engine subsystem
