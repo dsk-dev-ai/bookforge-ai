@@ -280,8 +280,11 @@ Markdown → PDF → EPUB → Completed Book
 | 02 — Architecture | System architecture, pipeline design, subsystem specification |
 | 03 — Provider Manager | LLM abstraction layer, NVIDIA/Ollama adapters |
 | 04 — Core Domain | Domain entities, value objects, enums, serialization |
-| 05 — Core Pipeline | Research, writing, review, markdown, PDF |
-| 06 — Production | API, web UI, deployment, monitoring |
+| 05 — Configuration | Configuration system, environment loading, settings |
+| 06 — Research Engine | Research planning, caching, deduplication, ranking |
+| 07 — Book Planning | Book blueprint, chapter outlines, dependency graphs, learning paths |
+| 08 — Core Pipeline | Writing, review, markdown, PDF |
+| 09 — Production | API, web UI, deployment, monitoring |
 
 ---
 
