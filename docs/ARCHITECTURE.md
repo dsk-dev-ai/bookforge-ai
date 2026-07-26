@@ -278,67 +278,171 @@ No existing code changes. No recompilation. No subsystem modification.
 
 ## Configuration Architecture
 
+The Configuration & Settings layer is implemented in ``packages/config/`` as a standalone Python package. Every subsystem obtains its settings through this package — no module reads environment variables directly.
+
+### Module Map
+
+| Module | Responsibility |
+|---|---|
+| ``enums.py`` | ``Environment``, ``LogLevel``, ``LogFormat``, ``StorageBackend`` enums |
+| ``environment.py`` | ``EnvironmentDetector`` — detects dev/test/staging/prod from env vars |
+| ``features.py`` | ``FeatureFlags`` — toggle subsystems and experimental features |
+| ``application.py`` | ``ApplicationSettings``, ``EnvironmentSettings`` — host, port, workers, CORS |
+| ``providers.py`` | ``NvidiaSettings``, ``OllamaSettings``, ``ProviderSettings`` — LLM provider config |
+| ``research.py`` | ``ResearchSettings`` — research engine concurrency, cache, quality |
+| ``writer.py`` | ``WriterSettings`` — batch size, chunk size, temperature |
+| ``review.py`` | ``ReviewSettings`` — review passes, thresholds, iterations |
+| ``publishing.py`` | ``PublishingSettings`` — export formats, output directory |
+| ``logging_.py`` | ``LoggingSettings`` — log level, format, rotation, trace IDs |
+| ``storage.py`` | ``StorageSettings`` — local/S3/GCS/Azure storage config |
+| ``security.py`` | ``SecuritySettings`` — API keys, JWT, CORS, rate limiting |
+| ``loader.py`` | ``BookForgeConfig`` (aggregate), ``load_config()`` — entry point |
+| ``validator.py`` | ``validate_settings()``, ``assert_valid_config()``, ``ConfigValidationError`` |
+| ``cache.py`` | ``SettingsCache``, ``get_settings_cache()`` — cached singleton access |
+
+### Settings Flow
+
 ```mermaid
 graph TB
-    subgraph "Configuration Sources"
+    subgraph "Sources"
         ENV[Environment Variables]
-        YAML[config/*.yaml Files]
-        DB[Database Settings Table]
-        CLI[CLI Arguments]
+        ENV_FILE[".env File"]
     end
 
-    subgraph "Configuration Manager"
-        LOADER[Config Loader]
-        MERGE[Merge Engine<br/>ENV > YAML > DB > CLI]
-        CACHE[Config Cache]
-        WATCH[Watch for Changes]
+    subgraph "packages/config"
+        LOADER[load_config]
+        CACHE[SettingsCache]
+        VALIDATOR[validate_settings]
+    end
+
+    subgraph "Settings Classes"
+        APP[ApplicationSettings<br/>BOOKFORGE_APP_*]
+        FEAT[FeatureFlags<br/>BOOKFORGE_FEATURE_*]
+        PROV[ProviderSettings<br/>BOOKFORGE_PROVIDER_*]
+        NVIDIA[NvidiaSettings<br/>NVIDIA_*]
+        OLLAMA[OllamaSettings<br/>OLLAMA_*]
+        RESEARCH[ResearchSettings<br/>BOOKFORGE_RESEARCH_*]
+        WRITER[WriterSettings<br/>BOOKFORGE_WRITER_*]
+        LOG[LoggingSettings<br/>BOOKFORGE_LOG_*]
+        STORAGE[StorageSettings<br/>BOOKFORGE_STORAGE_*]
+        SEC[SecuritySettings<br/>BOOKFORGE_SECURITY_*]
     end
 
     subgraph "Consumers"
-        SUBSYSTEMS[All Subsystems]
+        ALL[All Subsystems]
     end
 
     ENV --> LOADER
-    YAML --> LOADER
-    DB --> LOADER
-    CLI --> LOADER
-    LOADER --> MERGE
-    MERGE --> CACHE
-    CACHE --> SUBSYSTEMS
-    WATCH --> CACHE
+    ENV_FILE --> LOADER
+    LOADER --> CACHE
+    LOADER --> VALIDATOR
+    CACHE --> ALL
+    LOADER --- APP
+    LOADER --- FEAT
+    LOADER --- PROV
+    LOADER --- NVIDIA
+    LOADER --- OLLAMA
+    LOADER --- RESEARCH
+    LOADER --- WRITER
+    LOADER --- LOG
+    LOADER --- STORAGE
+    LOADER --- SEC
 ```
 
 ### Configuration Layers
 
-| Layer | Priority | Example | Scope |
-|---|---|---|---|
-| CLI arguments | Highest | `--log-level=debug` | Process |
-| Environment variables | High | `LLM_PROVIDER=nvidia` | Deployment |
-| YAML config files | Medium | `config/providers.yaml` | Environment |
-| Database settings | Low | Feature flags | Runtime |
+| Layer | Priority | Scope |
+|---|---|---|
+| Environment variables | Highest | Deployment-specific overrides |
+| ``.env`` file | Medium | Development defaults |
+| Pydantic field defaults | Lowest | Sensible production defaults |
 
-### LLM Environment Variables
+### Environment Variables by Settings Group
+
+**Environment** — ``BOOKFORGE_`` prefix:
 
 | Variable | Default | Description |
 |---|---|---|
-| `LLM_PROVIDER` | `nvidia` | Primary provider |
-| `LLM_FALLBACK_PROVIDER` | `ollama` | Fallback provider |
-| `LLM_DEFAULT_MODEL` | — | Default chat model |
-| `LLM_MAX_RETRIES` | `3` | Max retry attempts |
-| `LLM_RETRY_BACKOFF_FACTOR` | `2.0` | Exponential backoff multiplier |
-| `LLM_RETRY_MAX_DELAY` | `60.0` | Max backoff delay (seconds) |
-| `LLM_RETRY_JITTER` | `0.25` | Jitter fraction (±25%) |
-| `LLM_RATE_LIMIT_REQUESTS_PER_MINUTE` | `60` | Max requests/minute/provider |
-| `LLM_RATE_LIMIT_TOKENS_PER_MINUTE` | `100000` | Max tokens/minute/provider |
-| `LLM_HEALTH_CHECK_INTERVAL_SECONDS` | `60.0` | Health check interval |
-| `LLM_HEALTH_CHECK_TIMEOUT_SECONDS` | `10.0` | Health check timeout |
-| `LLM_CIRCUIT_BREAKER_THRESHOLD` | `5` | Failures before circuit opens |
-| `LLM_CIRCUIT_BREAKER_COOLDOWN_SECONDS` | `300.0` | Cooldown before half-open |
-| `NVIDIA_NIM_API_KEY` | — | NVIDIA NIM key |
-| `NVIDIA_NIM_BASE_URL` | `http://localhost:8000` | NVIDIA NIM URL |
-| `NVIDIA_NIM_MODEL` | `meta/llama-3.1-70b-instruct` | Default NVIDIA model |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama URL |
-| `OLLAMA_MODEL` | `llama3.1` | Default Ollama model |
+| ``BOOKFORGE_ENV`` | ``development`` | Runtime environment |
+
+**Application** — ``BOOKFORGE_APP_`` prefix:
+
+| Variable | Default | Description |
+|---|---|---|
+| ``BOOKFORGE_APP_NAME`` | ``bookforge`` | Application name |
+| ``BOOKFORGE_APP_VERSION`` | ``1.0.0`` | Application version |
+| ``BOOKFORGE_APP_DEBUG`` | ``true`` | Debug mode (auto-adjusted for prod) |
+| ``BOOKFORGE_APP_HOST`` | ``0.0.0.0`` | Server host |
+| ``BOOKFORGE_APP_PORT`` | ``8000`` | Server port |
+| ``BOOKFORGE_APP_WORKERS`` | ``4`` | Worker processes |
+
+**Provider** — ``BOOKFORGE_PROVIDER_``, ``NVIDIA_``, ``OLLAMA_`` prefixes:
+
+| Variable | Default | Description |
+|---|---|---|
+| ``BOOKFORGE_PROVIDER_PRIMARY`` | ``nvidia`` | Primary provider |
+| ``BOOKFORGE_PROVIDER_FALLBACK`` | ``ollama`` | Fallback provider |
+| ``BOOKFORGE_PROVIDER_MAX_RETRIES`` | ``3`` | Max retry attempts |
+| ``BOOKFORGE_PROVIDER_RETRY_BACKOFF`` | ``2.0`` | Exponential backoff factor |
+| ``BOOKFORGE_PROVIDER_RETRY_JITTER`` | ``0.25`` | Jitter fraction (±25%) |
+| ``NVIDIA_NIM_API_KEY`` | — | NVIDIA NIM API key |
+| ``NVIDIA_NIM_BASE_URL`` | ``http://localhost:8000`` | NVIDIA NIM base URL |
+| ``NVIDIA_NIM_MODEL`` | ``meta/llama-3.1-70b-instruct`` | Default NVIDIA model |
+| ``OLLAMA_BASE_URL`` | ``http://localhost:11434`` | Ollama base URL |
+| ``OLLAMA_MODEL`` | ``llama3.1`` | Default Ollama model |
+
+**Feature Flags** — ``BOOKFORGE_FEATURE_`` prefix:
+
+| Variable | Default | Description |
+|---|---|---|
+| ``BOOKFORGE_FEATURE_NVIDIA_ENABLED`` | ``true`` | Enable NVIDIA provider |
+| ``BOOKFORGE_FEATURE_OLLAMA_ENABLED`` | ``true`` | Enable Ollama provider |
+| ``BOOKFORGE_FEATURE_RESEARCH_ENABLED`` | ``true`` | Enable research engine |
+| ``BOOKFORGE_FEATURE_WRITER_ENABLED`` | ``true`` | Enable writing engine |
+| ``BOOKFORGE_FEATURE_PUBLISHING_ENABLED`` | ``true`` | Enable publishing engine |
+| ``BOOKFORGE_FEATURE_DASHBOARD_ENABLED`` | ``true`` | Enable web dashboard |
+| ``BOOKFORGE_FEATURE_EXPERIMENTAL_ENABLED`` | ``false`` | Enable experimental features |
+| ``BOOKFORGE_FEATURE_FALLBACK_ENABLED`` | ``true`` | Enable provider fallback |
+| ``BOOKFORGE_FEATURE_TELEMETRY_ENABLED`` | ``false`` | Enable anonymous telemetry |
+
+**Other settings groups** — each with its own prefix:
+
+| Prefix | Settings Class |
+|---|---|
+| ``BOOKFORGE_RESEARCH_`` | ``ResearchSettings`` |
+| ``BOOKFORGE_WRITER_`` | ``WriterSettings`` |
+| ``BOOKFORGE_REVIEW_`` | ``ReviewSettings`` |
+| ``BOOKFORGE_PUBLISHING_`` | ``PublishingSettings`` |
+| ``BOOKFORGE_LOG_`` | ``LoggingSettings`` |
+| ``BOOKFORGE_STORAGE_`` | ``StorageSettings`` |
+| ``BOOKFORGE_SECURITY_`` | ``SecuritySettings`` |
+
+### Usage
+
+```python
+from bookforge.config import load_config, Environment
+
+config = load_config()
+
+host = config.application.host             # ApplicationSettings
+port = config.application.port
+name = config.application.name             # BOOKFORGE_APP_NAME
+env = config.environment.env               # Environment.DEVELOPMENT
+nvidia_key = config.nvidia.nim_api_key     # NvidiaSettings
+feature = config.features.nvidia_enabled   # FeatureFlags
+```
+
+### Environment Detection
+
+Detection order: ``BOOKFORGE_ENV`` → ``APP_ENV`` → ``ENVIRONMENT`` → fallback to ``development``.
+
+```python
+from bookforge.config.environment import EnvironmentDetector
+
+detector = EnvironmentDetector()
+env = detector.detect()                     # Environment enum
+env = get_environment()                     # cached singleton
+```
 
 ---
 
@@ -614,3 +718,7 @@ restored = from_yaml(Book, y)
 | ADR-007 | Pydantic v2 for domain models | Type-safe, immutable value objects via ``frozen=True``, built-in JSON/dict serialization, field validation with ``field_validator``, model-level validation with ``model_validator``. |
 | ADR-008 | No custom base class | Domain models inherit directly from Pydantic ``BaseModel``. Avoids framework lock-in and keeps each model self-documenting. |
 | ADR-009 | Clean Architecture layering | Enums and value objects depend on nothing. Domain entities depend on value objects and enums. Serialization is a standalone utility. No entity references infrastructure or application concerns. |
+| ADR-010 | Centralized configuration package | Every subsystem reads settings through ``packages/config``. No module reads ``os.environ`` directly. Consistent env prefix scheme (``BOOKFORGE_*`` per group), Pydantic v2 validation at load time. |
+| ADR-011 | Per-group env prefixes | Each settings group has a distinct prefix (``BOOKFORGE_APP_*``, ``BOOKFORGE_FEATURE_*``, ``NVIDIA_*``, etc.) avoiding collisions and making it clear which subsystem a variable belongs to. |
+| ADR-012 | ``ClassVar`` for constants | ``DETECTION_ORDER`` on ``EnvironmentDetector`` uses ``ClassVar`` to satisfy mypy strict mode while keeping the list as a class-level constant. |
+| ADR-013 | ``logging_`` module name | The logging settings module uses ``logging_`` (trailing underscore) to avoid shadowing Python's ``logging`` standard library module. |
