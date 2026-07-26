@@ -1,17 +1,27 @@
 # `@bookforge/prompts`
 
-Prompt template management and versioning.
+Prompt Manager subsystem — template management and versioning.
 
 ## Responsibilities
 
-- Stores and manages versioned prompt templates
-- Loads templates from YAML files and database records
-- Renders templates with pipeline context variables
+- Stores and manages versioned prompt templates in the database
+- Provides template catalog with 9+ templates for every pipeline stage
+- Renders templates with pipeline context variables via Jinja2
 - Validates template variables against declared schemas
+- Tracks which template version generated which content (`prompt_usage` table)
 - Caches compiled templates for fast rendering
-- Tracks template usage per pipeline event for reproducibility
 - Supports template inheritance and partials
+- Enables A/B testing of prompt versions
+
+## Template Catalog
+
+`chapter-writer`, `section-writer`, `code-example`, `technical-review`, `style-review`, `structural-review`, `consistency-review`, `outline-generator`, `research-synthesis`, `diagram-description`
 
 ## Dependencies
 
-- `shared` — Types, configuration, utilities
+- `shared` — Types, configuration, Jinja2 rendering utilities
+
+## Referenced In
+
+- `docs/PROMPTS.md` — Full prompt management documentation
+- `docs/ARCHITECTURE.md` — Prompt Manager subsystem

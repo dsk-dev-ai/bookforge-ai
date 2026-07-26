@@ -1,29 +1,39 @@
 # `@bookforge/web`
 
-Web user interface for BookForge AI.
+Next.js web dashboard for BookForge AI.
 
 ## Responsibilities
 
-- Provides a dashboard for managing book projects
-- Offers a book editor for viewing and editing chapter content
-- Displays pipeline progress and status updates
-- Provides a review interface for approving or requesting changes
-- Enables PDF download of completed books
-- Communicates exclusively with the REST API
+- **Dashboard** — Overview of recent books, pipeline status, system health
+- **Book Editor** — Create and edit book specifications
+- **Pipeline Monitor** — Real-time progress tracking with stage-level detail
+- **Review Interface** — Chapter verdicts, findings, approve/revise actions
+- **Project Management** — Collaborator invitations and role management
+- **Download Center** — PDF and EPUB download with file sizes
+
+## Architecture Role
+
+The web UI communicates exclusively with the REST API. It holds no business logic, accesses no databases, and makes no LLM calls. It is a pure presentation layer.
 
 ## Technology
 
-- **Framework:** Next.js
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS
-- **API client:** Generated OpenAPI client
+| Component | Technology |
+|---|---|
+| Framework | Next.js 14+ |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| API Client | Generated OpenAPI client |
+| State Management | React Query |
+| Real-time Updates | Server-Sent Events for pipeline progress |
 
 ## Running
 
 ```bash
-npm run dev
+npm run dev        # Development
+npm run build      # Production build
+npm run start      # Production serve
 ```
 
 ## Dependencies
 
-- `api` — REST API (required backend service)
+- `api` — REST API (required backend)

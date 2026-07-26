@@ -1,17 +1,24 @@
 # `@bookforge/shared`
 
-Shared utilities, types, and configuration.
+Shared types, base classes, configuration management, and cross-cutting utilities.
 
 ## Responsibilities
 
-- Common type definitions (`BookSpec`, `ChapterContent`, `LLMConfig`, etc.)
-- Configuration management (environment variables, settings objects)
-- Structured logging and error types
-- Pydantic base models for consistent serialisation
-- Utility functions (text processing, token counting, string normalisation)
-- Rate limiter implementation (token bucket)
-- Retry and backoff utilities
+- Common type definitions used by all subsystems (`BookSpec`, `ChapterContent`, `LLMConfig`, `PipelineContext`, `StageResult`)
+- Configuration Manager — loads from YAML, environment variables, database; layered merge with priority ordering
+- Structured logging with consistent JSON schema, subsystem tagging, and trace IDs
+- Base exception hierarchy (`BookForgeError`, `ProviderError`, `ConfigurationError`, `PipelineError`)
+- Pydantic base models for serialisation consistency
+- Rate limiter implementation (token bucket algorithm)
+- Retry and backoff utilities with jitter
+- Health check response types
+- Pagination types for API responses
 
 ## Dependencies
 
 - None (leaf package)
+
+## Referenced In
+
+- `docs/ARCHITECTURE.md` — Configuration Manager, Logging System
+- `docs/API.md` — Response envelope types
