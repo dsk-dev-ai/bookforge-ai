@@ -20,6 +20,7 @@ from bookforge.core.enums import (
     GenerationStage,
     Language,
 )
+from bookforge.core.serialization import from_yaml, to_yaml
 from bookforge.core.value_objects import Version
 from pydantic import ValidationError
 
@@ -196,6 +197,13 @@ class TestBook:
         with pytest.raises(ValidationError, match="Duplicate chapter numbers"):
             Book(id="book1", metadata=meta, chapters=[ch1, ch2])
 
+    def test_duplicate_chapter_id_at_validation(self) -> None:
+        meta = BookMetadata(title="Test")
+        ch1 = Chapter(id="ch1", number=1, title="Intro")
+        ch2 = Chapter(id="ch1", number=2, title="Intro 2")
+        with pytest.raises(ValidationError, match="Duplicate chapter IDs"):
+            Book(id="book1", metadata=meta, chapters=[ch1, ch2])
+
     def test_remove_chapter(self) -> None:
         meta = BookMetadata(title="Test")
         book = Book(id="book1", metadata=meta)
@@ -227,6 +235,15 @@ class TestBook:
         book = Book(id="book1", metadata=meta, references=[ref])
         assert len(book.references) == 1
         assert book.references[0].title == "A Book"
+
+    def test_duplicate_reference_ids_at_validation(self) -> None:
+        from bookforge.core.reference import Reference
+
+        meta = BookMetadata(title="Test")
+        ref1 = Reference(id="ref1", title="Book A", authors=["A"], year=2024)
+        ref2 = Reference(id="ref1", title="Book B", authors=["B"], year=2024)
+        with pytest.raises(ValidationError, match="Duplicate reference IDs"):
+            Book(id="book1", metadata=meta, references=[ref1, ref2])
 
     def test_with_glossary(self) -> None:
         meta = BookMetadata(title="Test")
@@ -347,3 +364,26 @@ class TestSerialization:
         assert restored.metadata.title == "Test Book"
         assert restored.chapters[0].title == "Start"
         assert restored.chapters[0].sections[0].paragraphs[0].text == "Hello"
+
+    def test_yaml_roundtrip(self) -> None:
+        meta = BookMetadata(title="YAML Test", language=Language.FRENCH)
+        chapter = Chapter(id="ch1", number=1, title="Chapter One")
+        book = Book(id="book1", metadata=meta, chapters=[chapter])
+        yaml_str = to_yaml(book)
+        restored = from_yaml(Book, yaml_str)
+        assert restored.id == "book1"
+        assert restored.metadata.title == "YAML Test"
+        assert restored.metadata.language == Language.FRENCH
+        assert restored.chapters[0].title == "Chapter One"
+
+    def test_yaml_roundtrip_with_all_fields(self) -> None:
+        para = Paragraph(text="Content")
+        section = Section(id="sec1", heading="Intro", paragraphs=[para])
+        chapter = Chapter(id="ch1", number=1, title="Start", sections=[section])
+        meta = BookMetadata(title="Full Book", tags=["a", "b"])
+        book = Book(id="book1", metadata=meta, chapters=[chapter])
+        yaml_str = to_yaml(book)
+        restored = from_yaml(Book, yaml_str)
+        assert restored.id == "book1"
+        assert restored.chapters[0].sections[0].paragraphs[0].text == "Content"
+        assert restored.metadata.tags == ["a", "b"]

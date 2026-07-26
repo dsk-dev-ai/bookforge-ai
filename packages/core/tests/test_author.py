@@ -48,6 +48,11 @@ class TestAuthor:
                 email=EmailAddress(address="not-valid"),
             )
 
+    def test_empty_id_raises(self) -> None:
+        name = PersonName(first="John", last="Doe")
+        with pytest.raises(ValidationError):
+            Author(id="", name=name, display_name="John")
+
     def test_full_name_method(self) -> None:
         name = PersonName(first="Alice", last="Johnson")
         author = Author(id="auth3", name=name, display_name="Alice J.")

@@ -250,7 +250,7 @@ class LLMProvider(ABC):
 
 ### Routing Strategy
 
-```
+```text
 1. Consumer calls ProviderManager.chat(messages)
 2. ProviderManager calls ModelRouter.route(Capability.CHAT)
 3. ModelRouter finds RoutingRule for CHAT capability
@@ -377,7 +377,7 @@ flowchart TB
 
 ### Fallback Strategy
 
-```
+```text
 1. Primary provider fails after exhausting retries
 2. Circuit breaker records failure (opens after threshold)
 3. Select fallback provider from configuration

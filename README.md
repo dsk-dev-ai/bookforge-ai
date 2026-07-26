@@ -149,7 +149,7 @@ await manager.stop()
 
 ## Project Structure
 
-```
+```text
 bookforge-ai/
 ├── apps/
 │   ├── api/              # FastAPI REST API
@@ -253,7 +253,7 @@ make dev
 
 ## Pipeline
 
-```
+```text
 Book Request → Validation → Specification → Outline → Research →
 Knowledge Base → Writing → Review → Diagrams → Cover →
 Markdown → PDF → EPUB → Completed Book
@@ -275,7 +275,7 @@ Markdown → PDF → EPUB → Completed Book
 ## Roadmap
 
 | Phase | Focus |
-|---|---|---|
+|-------|-------|
 | 01 — Foundation | Project structure, documentation, templates |
 | 02 — Architecture | System architecture, pipeline design, subsystem specification |
 | 03 — Provider Manager | LLM abstraction layer, NVIDIA/Ollama adapters |

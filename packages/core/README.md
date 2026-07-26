@@ -10,7 +10,7 @@ No provider integrations, no API calls, no database, no business workflows — o
 
 ## Package
 
-```
+```text
 packages/core/src/bookforge/core/
 ├── __init__.py          # Public API exports
 ├── enums.py             # All enumerations
@@ -115,7 +115,7 @@ restored = Book.model_validate_json(j)  # JSON → entity
 
 ## Requirements
 
-```
+```text
 pydantic>=2.0
 pyyaml>=6.0
 ```

@@ -29,8 +29,8 @@ def from_json(cls: type[T], data: str, **kwargs: Any) -> T:
 
 
 def to_yaml(model: BaseModel, **kwargs: Any) -> str:
-    """Serialize a Pydantic model to a YAML string."""
-    return cast("str", yaml.dump(model.model_dump(mode="python"), **kwargs))
+    """Serialize a Pydantic model to a YAML string (safe, JSON-compatible)."""
+    return cast("str", yaml.safe_dump(model.model_dump(mode="json"), **kwargs))
 
 
 def from_yaml(cls: type[T], data: str, **kwargs: Any) -> T:

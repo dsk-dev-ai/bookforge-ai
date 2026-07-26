@@ -152,16 +152,38 @@ class Book(BaseModel):
         return stripped
 
     @model_validator(mode="after")
-    def _validate_unique_chapter_numbers(self) -> Book:
+    def _validate_unique_chapters(self) -> Book:
         numbers = [ch.number for ch in self.chapters]
         if len(numbers) != len(set(numbers)):
-            seen: list[int] = []
-            dupes: list[int] = []
+            seen_n: list[int] = []
+            dupes_n: list[int] = []
             for n in numbers:
-                if n in seen:
-                    dupes.append(n)
-                seen.append(n)
-            raise ValueError(f"Duplicate chapter numbers: {dupes}")
+                if n in seen_n:
+                    dupes_n.append(n)
+                seen_n.append(n)
+            raise ValueError(f"Duplicate chapter numbers: {dupes_n}")
+        ids = [ch.id for ch in self.chapters]
+        if len(ids) != len(set(ids)):
+            seen_i: list[str] = []
+            dupes_i: list[str] = []
+            for i in ids:
+                if i in seen_i:
+                    dupes_i.append(i)
+                seen_i.append(i)
+            raise ValueError(f"Duplicate chapter IDs: {dupes_i}")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_unique_reference_ids(self) -> Book:
+        ids = [r.id for r in self.references]
+        if len(ids) != len(set(ids)):
+            seen_r: list[str] = []
+            dupes_r: list[str] = []
+            for i in ids:
+                if i in seen_r:
+                    dupes_r.append(i)
+                seen_r.append(i)
+            raise ValueError(f"Duplicate reference IDs: {dupes_r}")
         return self
 
     def add_chapter(self, chapter: Chapter) -> None:

@@ -4,7 +4,7 @@ from datetime import date
 
 from bookforge.core.enums import ReferenceType
 from bookforge.core.value_objects import URL
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Reference(BaseModel):
@@ -82,6 +82,19 @@ class Bibliography(BaseModel):
         if not stripped:
             raise ValueError("bibliography id must not be empty")
         return stripped
+
+    @model_validator(mode="after")
+    def _validate_unique_reference_ids(self) -> Bibliography:
+        ids = [r.id for r in self.references]
+        if len(ids) != len(set(ids)):
+            seen: list[str] = []
+            dupes: list[str] = []
+            for i in ids:
+                if i in seen:
+                    dupes.append(i)
+                seen.append(i)
+            raise ValueError(f"Duplicate reference IDs in bibliography: {dupes}")
+        return self
 
     def add_reference(self, ref: Reference) -> None:
         existing_ids = {r.id for r in self.references}

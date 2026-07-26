@@ -115,6 +115,12 @@ class TestBibliography:
         with pytest.raises(ValueError, match="already exists"):
             bib.add_reference(ref)
 
+    def test_duplicate_reference_ids_at_construction(self) -> None:
+        ref1 = Reference(id="ref1", title="A Book", authors=["Author"], year=2024)
+        ref2 = Reference(id="ref1", title="Another Book", authors=["Author"], year=2025)
+        with pytest.raises(ValidationError, match="Duplicate reference IDs"):
+            Bibliography(id="bib1", references=[ref1, ref2])
+
     def test_remove_reference(self) -> None:
         bib = Bibliography(id="bib1")
         ref = Reference(id="ref1", title="A Book", authors=["Author"], year=2024)
