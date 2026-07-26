@@ -250,7 +250,7 @@ class LLMProvider(ABC):
 
 ### Routing Strategy
 
-```
+```text
 1. Consumer calls ProviderManager.chat(messages)
 2. ProviderManager calls ModelRouter.route(Capability.CHAT)
 3. ModelRouter finds RoutingRule for CHAT capability
@@ -377,7 +377,7 @@ flowchart TB
 
 ### Fallback Strategy
 
-```
+```text
 1. Primary provider fails after exhausting retries
 2. Circuit breaker records failure (opens after threshold)
 3. Select fallback provider from configuration
@@ -494,7 +494,114 @@ graph TB
 | Stateless workers | Workers hold no state between jobs. Any worker can pick up any job. |
 | Event-driven orchestration | Events decouple stage producers from stage consumers. |
 
-## Architecture Decision Records
+---
+
+## Core Domain Layer
+
+The Core Domain Layer is implemented in ``packages/core/`` as a standalone Python package. It defines every business entity that all subsystems depend on.
+
+### Domain Model Diagram
+
+```mermaid
+classDiagram
+    class Project {
+        +id: str
+        +name: str
+        +description: str
+        +books: list[Book]
+        +created_at: datetime
+        +updated_at: datetime
+        +version: Version
+    }
+    class Book {
+        +id: str
+        +metadata: BookMetadata
+        +specification: BookSpecification
+        +settings: BookSettings
+        +configuration: BookConfiguration
+        +chapters: list[Chapter]
+        +references: list[Reference]
+        +glossary_terms: dict[str,str]
+        +isbn: ISBN
+    }
+    class BookMetadata { title, subtitle, language, tags, edition }
+    class BookSpecification { audience, difficulty, page_count, learning_objectives }
+    class BookSettings { temperature, top_p, style_guide, tone }
+    class BookConfiguration { status, stage, is_locked, timestamps, version }
+    class Chapter { number, title, sections, introduction, summary }
+    class Section { heading, paragraphs, code_examples, diagrams, images, tables }
+    class Paragraph { text, style, is_code_block, list_type }
+    class CodeExample { code, language, title, explanation }
+    class Diagram { diagram_type, source, caption, alt_text }
+    class ImageAsset { url, alt_text, dimensions }
+    class Table { headers, rows, caption }
+    class Reference { title, authors, year, type, doi, url }
+    class Citation { reference_id, context, page_range, quotation }
+    class Bibliography { references, style }
+    class Author { name, email, bio, specialties }
+    class PromptTemplate { name, template, variables, category }
+    class Category { name, description, parent }
+    class Tag { name, category }
+    class LearningObjective { description, bloom_level, chapter }
+    class PublishingInfo { isbn, publisher, edition, price }
+    class ReviewInfo { reviewer, status, rating, comments }
+    class ExportInfo { format, file_path, status, size }
+
+    Project "1" *-- "many" Book
+    Book "1" *-- "many" Chapter
+    Book "1" *-- "many" Reference
+    Chapter "1" *-- "many" Section
+    Section "1" *-- "many" Paragraph
+    Section "1" *-- "many" CodeExample
+    Section "1" *-- "many" Diagram
+    Section "1" *-- "many" ImageAsset
+    Section "1" *-- "many" Table
+    Section "1" *-- "many" Section : subsections
+```
+
+### Module Map
+
+| Module | Contents |
+|---|---|
+| ``enums.py`` | Difficulty, Audience, Language, BookStatus, GenerationStage, ExportFormat, DiagramType, ReferenceType, AssetType, CodeLanguage, BloomLevel |
+| ``value_objects.py`` | PersonName, EmailAddress, URL, ISBN, PageRange, Version, Color, ImageDimension |
+| ``book.py`` | Project, Book, BookMetadata, BookSpecification, BookSettings, BookConfiguration, Chapter, Section |
+| ``content.py`` | Paragraph, CodeExample, Diagram, ImageAsset, Table |
+| ``reference.py`` | Reference, Citation, Bibliography |
+| ``prompt.py`` | PromptTemplate |
+| ``author.py`` | Author |
+| ``taxonomy.py`` | Category, Tag, LearningObjective |
+| ``publishing.py`` | PublishingInfo, ReviewInfo, ExportInfo |
+| ``serialization.py`` | to_dict, from_dict, to_json, from_json, to_yaml, from_yaml |
+
+### Validation Rules
+
+- **Empty strings**: All `title`, `name`, `text`, `heading`, `id` fields reject empty or whitespace-only values
+- **Unique constraints**: Chapter numbers within a book, book IDs within a project, reference IDs within a bibliography
+- **Range checks**: Page counts ≥ 1, temperature 0.0–2.0, rating 1–5, indent 0–10
+- **Format checks**: ISBN-10/13 checksum, email regex, URL scheme, hex color `#RRGGBB`
+- **Structural**: Table row column counts must match header count
+
+### Serialization
+
+Every entity supports dict, JSON, and YAML:
+
+```python
+from bookforge.core.serialization import to_dict, to_json, to_yaml
+from bookforge.core import Book, BookMetadata
+
+book = Book(id="b1", metadata=BookMetadata(title="Python Deep Dive"))
+d = to_dict(book)          # dict
+j = to_json(book)          # JSON string
+y = to_yaml(book)          # YAML string
+
+from bookforge.core.serialization import from_dict, from_json, from_yaml
+restored = from_dict(Book, d)
+restored = from_json(Book, j)
+restored = from_yaml(Book, y)
+```
+
+### Architecture Decision Records
 
 | ID | Decision | Rationale |
 |---|---|---|
@@ -504,3 +611,6 @@ graph TB
 | ADR-004 | Pydantic Settings for configuration | Type-safe configuration loading. Automatic .env file support. Clear validation errors on misconfiguration. |
 | ADR-005 | Provider adapters raise NotImplementedError for HTTP | Keeps the adapter layer pure — HTTP client injection is the integration boundary. Testable with mocks without real HTTP calls. |
 | ADR-006 | Routing rules as data, not code | Routing policy is a list of ``RoutingRule`` dataclasses. Changing provider priority is a configuration change, not a code change. |
+| ADR-007 | Pydantic v2 for domain models | Type-safe, immutable value objects via ``frozen=True``, built-in JSON/dict serialization, field validation with ``field_validator``, model-level validation with ``model_validator``. |
+| ADR-008 | No custom base class | Domain models inherit directly from Pydantic ``BaseModel``. Avoids framework lock-in and keeps each model self-documenting. |
+| ADR-009 | Clean Architecture layering | Enums and value objects depend on nothing. Domain entities depend on value objects and enums. Serialization is a standalone utility. No entity references infrastructure or application concerns. |
