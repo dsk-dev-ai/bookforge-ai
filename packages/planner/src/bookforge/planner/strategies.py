@@ -43,7 +43,11 @@ class ProgressiveLearningStrategy(PlanningStrategy):
         sorted_titles = dep_graph.topological_sort()
 
         title_map = {c.title: c for c in b.outline.chapters} if b.outline else {}
-        sorted_chapters = [title_map[t] for t in sorted_titles if t in title_map]
+        sorted_chapters: list[ChapterPlan] = [title_map[t] for t in sorted_titles if t in title_map]
+        placed = {c.title for c in sorted_chapters}
+        for ch in (b.outline.chapters if b.outline else []):
+            if ch.title not in placed:
+                sorted_chapters.append(ch)
 
         if b.outline:
             b.outline.chapters = sorted_chapters

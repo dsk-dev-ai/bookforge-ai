@@ -109,9 +109,12 @@ class DependencyGraph(BaseModel):
         return False
 
     def topological_sort(self) -> list[str]:
+        known = set(self.chapter_titles)
         adj: dict[str, list[str]] = {t: [] for t in self.chapter_titles}
         in_degree: dict[str, int] = {t: 0 for t in self.chapter_titles}
         for e in self.edges:
+            if e.from_chapter not in known or e.to_chapter not in known:
+                continue
             adj[e.from_chapter].append(e.to_chapter)
             in_degree[e.to_chapter] += 1
 

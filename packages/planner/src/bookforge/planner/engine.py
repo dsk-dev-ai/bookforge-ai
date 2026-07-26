@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from bookforge.planner.estimators import (
     AudienceAnalyzer,
     ChapterEstimator,
@@ -79,14 +81,13 @@ class PlannerEngine:
         self,
         blueprint: BookBlueprint,
         format: str = "json",
-    ) -> str:
+    ) -> str | dict[str, Any]:
         if format == "json":
             return self._exporter.to_json(blueprint)
         if format == "yaml":
             return self._exporter.to_yaml(blueprint)
         if format == "dict":
-            import json
-            return json.dumps(self._exporter.to_dict(blueprint), indent=2, default=str)
+            return self._exporter.to_dict(blueprint)
         raise ValueError(f"Unsupported export format: {format}")
 
     def validate_blueprint(self, blueprint: BookBlueprint) -> list[ValidationMessage]:

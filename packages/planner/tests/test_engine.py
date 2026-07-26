@@ -32,6 +32,7 @@ class TestPlannerEngine:
         engine = PlannerEngine()
         blueprint = engine.plan_book("Test", ["Ch1"])
         result = engine.export_blueprint(blueprint, format="dict")
+        assert isinstance(result, dict)
         assert "title" in result
 
     def test_export_invalid_format(self) -> None:

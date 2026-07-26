@@ -57,9 +57,12 @@ class PlannerManager:
         strategy_types: Sequence[PlanningStrategyType] | None = None,
     ) -> BookBlueprint:
         blueprint = self._get_blueprint(blueprint_id)
-        strategies = self._resolve_strategies(strategy_types)
-        planner = BookPlanner(strategies=strategies) if strategies else self._planner
-        planned = planner.plan(blueprint)
+        if strategy_types is not None:
+            strategies = self._resolve_strategies(strategy_types)
+            planner = BookPlanner(strategies=strategies)
+            planned = planner.plan(blueprint)
+        else:
+            planned = self._planner.plan(blueprint)
         self._blueprints[blueprint_id] = planned
         return planned
 

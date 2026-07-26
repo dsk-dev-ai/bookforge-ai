@@ -31,6 +31,31 @@ class TestProgressiveLearningStrategy:
         assert result.outline.chapters[0].title == "Basic"
         assert result.outline.chapters[1].title == "Advanced"
 
+    def test_apply_with_cycle_preserves_all_chapters(self) -> None:
+        s = ProgressiveLearningStrategy()
+        chapters = [
+            ChapterPlan(title="A", prerequisites=["B"]),
+            ChapterPlan(title="B", prerequisites=["C"]),
+            ChapterPlan(title="C", prerequisites=["A"]),
+        ]
+        outline = BookOutline(title="T", chapters=chapters)
+        bp = BookBlueprint(
+            title="T", topic="T", outline=outline, estimated_chapters=3,
+            dependency_graph=DependencyGraph(
+                edges=[
+                    DependencyEdge(from_chapter="A", to_chapter="B"),
+                    DependencyEdge(from_chapter="B", to_chapter="C"),
+                    DependencyEdge(from_chapter="C", to_chapter="A"),
+                ],
+                chapter_titles=["A", "B", "C"],
+            ),
+        )
+        result = s.apply(bp)
+        assert result.outline is not None
+        assert len(result.outline.chapters) == 3
+        titles = {c.title for c in result.outline.chapters}
+        assert titles == {"A", "B", "C"}
+
     def test_apply_creates_learning_path(self) -> None:
         s = ProgressiveLearningStrategy()
         chapters = [ChapterPlan(title="Ch1", estimated_minutes=30)]

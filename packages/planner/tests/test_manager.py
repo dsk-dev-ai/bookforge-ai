@@ -52,6 +52,13 @@ class TestPlannerManager:
         planned = manager.plan_blueprint(bp_id)
         assert planned.learning_path is not None
 
+    def test_plan_blueprint_empty_strategies(self) -> None:
+        manager = PlannerManager()
+        _ = manager.create_blueprint("T", ["Ch1"])
+        bp_id = next(iter(manager._blueprints.keys()))
+        planned = manager.plan_blueprint(bp_id, strategy_types=[])
+        assert planned is not None
+
     def test_plan_blueprint_with_strategies(self) -> None:
         manager = PlannerManager()
         _ = manager.create_blueprint("T", ["Ch1"])

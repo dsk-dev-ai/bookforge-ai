@@ -5,6 +5,7 @@ description = "Book planning engine for BookForge AI"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -12,7 +13,6 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
     "mypy>=1.8",
-    "pyyaml>=6.0",
 ]
 
 [build-system]

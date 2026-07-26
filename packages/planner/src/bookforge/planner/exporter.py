@@ -21,7 +21,7 @@ class OutlineExporter:
     def to_yaml(self, blueprint: BookBlueprint) -> str:
         import yaml
         data = self.to_dict(blueprint)
-        return yaml.dump(data, default_flow_style=False, sort_keys=False)
+        return yaml.safe_dump(data, default_flow_style=False, sort_keys=False)
 
     def _blueprint_to_dict(self, blueprint: BookBlueprint) -> dict[str, Any]:
         result: dict[str, Any] = {

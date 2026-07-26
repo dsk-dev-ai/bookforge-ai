@@ -108,6 +108,23 @@ class TestDependencyGraph:
         )
         assert g.has_cycle()
 
+    def test_topological_sort_ignores_unknown_edges(self) -> None:
+        g = DependencyGraph(
+            edges=[
+                DependencyEdge(from_chapter="Ch1", to_chapter="Ch2"),
+                DependencyEdge(from_chapter="Unknown", to_chapter="Ch1"),
+                DependencyEdge(from_chapter="Ch2", to_chapter="Missing"),
+            ],
+            chapter_titles=["Ch1", "Ch2"],
+        )
+        ordered = g.topological_sort()
+        assert "Ch1" in ordered
+        assert "Ch2" in ordered
+
+    def test_topological_sort_no_crash_empty(self) -> None:
+        g = DependencyGraph(edges=[], chapter_titles=[])
+        assert g.topological_sort() == []
+
     def test_topological_sort(self) -> None:
         g = DependencyGraph(
             edges=[
