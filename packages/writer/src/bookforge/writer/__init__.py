@@ -1,52 +1,65 @@
 from bookforge.writer.assembler import MarkdownAssembler
 from bookforge.writer.chapter_writer import ChapterWriter
+from bookforge.writer.code_example_writer import CodeExampleWriter
+from bookforge.writer.conclusion_writer import ConclusionWriter
 from bookforge.writer.engine import WriterEngine
 from bookforge.writer.enums import DraftQuality, ValidationSeverity, WritingStage, WritingStatus
 from bookforge.writer.exporter import WritingExporter  # noqa: F401
 from bookforge.writer.glossary_writer import GlossaryWriter
+from bookforge.writer.introduction_writer import IntroductionWriter
 from bookforge.writer.manager import WriterManager
 from bookforge.writer.models import (
-    BackMatterDraft,
-    BookDraft,
-    ChapterDraft,
     ContentGenerator,
-    FrontMatterDraft,
-    GlossaryDraft,
+    DraftBackMatter,
+    DraftBook,
+    DraftChapter,
+    DraftFrontMatter,
+    DraftGlossary,
+    DraftReferences,
+    DraftSection,
     GlossaryEntry,
-    ReferenceDraft,
     ReferenceEntry,
-    SectionDraft,
     ValidationMessage,
     WritingConfig,
+    WritingContext,
     WritingJob,
+    WritingMetrics,
+    WritingSession,
+    WritingStatistics,
 )
 from bookforge.writer.pipeline import WriterPipeline, WriterPipelineResult
-from bookforge.writer.prompt_builder import PromptBuilder
+from bookforge.writer.prompt_builder import PromptBuilder, PromptTemplate
 from bookforge.writer.prompt_renderer import PromptRenderer
 from bookforge.writer.reference_writer import ReferenceWriter
 from bookforge.writer.section_writer import SectionWriter
+from bookforge.writer.table_writer import TableWriter
 from bookforge.writer.validator import ContentValidator
 
 __all__ = [
-    "BackMatterDraft",
-    "BookDraft",
-    "ChapterDraft",
     "ChapterWriter",
+    "CodeExampleWriter",
+    "ConclusionWriter",
     "ContentGenerator",
     "ContentValidator",
+    "DraftBackMatter",
+    "DraftBook",
+    "DraftChapter",
+    "DraftFrontMatter",
+    "DraftGlossary",
     "DraftQuality",
-    "FrontMatterDraft",
-    "GlossaryDraft",
+    "DraftReferences",
+    "DraftSection",
     "GlossaryEntry",
     "GlossaryWriter",
+    "IntroductionWriter",
     "MarkdownAssembler",
     "PromptBuilder",
     "PromptRenderer",
-    "ReferenceDraft",
+    "PromptTemplate",
     "ReferenceEntry",
     "ReferenceWriter",
-    "SectionDraft",
     "SectionWriter",
+    "TableWriter",
     "ValidationMessage",
     "ValidationSeverity",
     "WriterEngine",
@@ -55,7 +68,11 @@ __all__ = [
     "WriterPipeline",
     "WriterPipelineResult",
     "WritingConfig",
+    "WritingContext",
     "WritingJob",
+    "WritingMetrics",
+    "WritingSession",
     "WritingStage",
+    "WritingStatistics",
     "WritingStatus",
 ]

@@ -634,6 +634,135 @@ OutlineExporter.{to_dict,to_json,to_yaml}()
 4. **Validation-first** — blueprints are validated before export; errors are
    collected, not raised, to give a full picture of issues.
 
+## Writing Engine Architecture
+
+The Writing Engine is implemented in `packages/writer/` as a standalone Python package. It transforms a `BookBlueprint` (from the planner) and `ResearchResult` (from the research engine) into a `DraftBook` with structured Markdown content through provider-independent LLM generation.
+
+### Module Map
+
+| Module | Responsibility |
+|---|---|
+| `enums.py` | `WritingStatus`, `WritingStage`, `DraftQuality`, `ValidationSeverity` |
+| `models.py` | `DraftBook`, `DraftChapter`, `DraftSection`, `WritingContext`, `WritingSession`, `WritingStatistics`, `WritingMetrics`, `WritingJob`, `ContentGenerator` ABC |
+| `prompt_builder.py` | `PromptBuilder` — composes prompts from reusable `SYSTEM_PARTS` and `USER_PARTS` dictionaries; `PromptTemplate` — system/user pair with variable substitution |
+| `prompt_renderer.py` | `PromptRenderer` — formats messages for provider consumption |
+| `chapter_writer.py` | `ChapterWriter` — generates full chapter content |
+| `section_writer.py` | `SectionWriter` — generates individual section content |
+| `introduction_writer.py` | `IntroductionWriter` — prepends introductions to chapters |
+| `conclusion_writer.py` | `ConclusionWriter` — appends conclusions to chapters |
+| `glossary_writer.py` | `GlossaryWriter` — generates glossary definitions |
+| `reference_writer.py` | `ReferenceWriter` — generates reference documentation |
+| `code_example_writer.py` | `CodeExampleWriter` — standalone code examples |
+| `table_writer.py` | `TableWriter` — Markdown tables |
+| `assembler.py` | `MarkdownAssembler` — composes chapters, sections, front/back matter, glossary, references into a single Markdown document |
+| `validator.py` | `ContentValidator` — validates output for empty content, duplicates, broken Markdown, invalid code fences, missing references |
+| `exporter.py` | `WritingExporter` — exports drafts to Markdown, dict, JSON, file |
+| `pipeline.py` | `WriterPipeline` — orchestrates all writer stages in order |
+| `engine.py` | `WriterEngine` — top-level facade for all writing operations |
+| `manager.py` | `WriterManager` — job/session lifecycle management |
+
+### Writing Pipeline
+
+```mermaid
+graph TB
+    BP[BookBlueprint] --> WC[WritingContext]
+    RS[ResearchResult] --> WC
+    WC --> DW[DraftBook.create]
+
+    DW --> CW[ChapterWriter]
+    CW --> IW[IntroductionWriter]
+    IW --> SW[SectionWriter]
+    SW --> COW[ConclusionWriter]
+    COW --> GW[GlossaryWriter]
+    GW --> RW[ReferenceWriter]
+    RW --> CV[ContentValidator]
+    CV --> MA[MarkdownAssembler]
+    MA --> OUT[DraftBook + Markdown]
+
+    subgraph "LLM"
+        CG[ContentGenerator]
+    end
+    CW -.-> CG
+    IW -.-> CG
+    SW -.-> CG
+    COW -.-> CG
+    GW -.-> CG
+    RW -.-> CG
+```
+
+### Prompt Composition
+
+Prompts are composed from reusable parts rather than hardcoded strings:
+
+```python
+# PromptBuilder composes system + user prompt parts
+system_keys = ["role", "format", "headings", "code", "practical"]
+user_keys = ["context", "audience", "chapter_context", "research", "word_count"]
+system, user = self.build_prompt(system_keys, user_keys, **variables)
+```
+
+Parts are registered in `SYSTEM_PARTS` and `USER_PARTS` dictionaries and composed by key. This enables:
+- Reuse of common instructions (format, code blocks, audience)
+- Per-prompt-type variation (glossary vs chapter vs section)
+- Variable substitution via `str.format()`
+
+### Provider Integration
+
+The Writing Engine integrates with LLM providers **only** through the `ContentGenerator` ABC:
+
+```python
+class ContentGenerator(ABC):
+    @abstractmethod
+    async def generate(self, prompt: str, **kwargs: Any) -> str: ...
+    @abstractmethod
+    async def generate_stream(self, prompt: str, **kwargs: Any) -> AsyncIterator[str]: ...
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+```
+
+The application layer bridges `ContentGenerator` to `ProviderManager`:
+
+```python
+class LLMContentGenerator(ContentGenerator):
+    def __init__(self, manager: ProviderManager):
+        self._manager = manager
+
+    async def generate(self, prompt: str, **kwargs) -> str:
+        from bookforge.llm.models import Message, MessageRole
+        response = await self._manager.chat(
+            [Message(role=MessageRole.USER, content=prompt)],
+        )
+        return response.content
+```
+
+This ensures the writer is provider-independent — no direct dependency on NVIDIA, Ollama, or any specific LLM package.
+
+### Content Validation
+
+| Check | Severity | Description |
+|---|---|---|
+| Empty chapter | ERROR | Chapter has no content and no sections |
+| Empty section | WARNING | Section has no written content |
+| Duplicate section | ERROR | Two sections with the same heading in a chapter |
+| Very short chapter | WARNING | Content under 50 words |
+| H1 in chapter | WARNING | Chapter content uses H1 (should be H2+) |
+| Invalid code fence | WARNING | Fence language specifier is not a valid identifier |
+| Unclosed code fence | ERROR | Odd number of fence markers |
+| Orphaned table separator | WARNING | `|---` line without preceding table header |
+| Missing references | WARNING | Content references external resources but no references section |
+| Empty front/back matter | WARNING | Front/back matter title with no content |
+
+### Architecture Decision Records
+
+| ID | Decision | Rationale |
+|---|---|---|
+| ADR-018 | ContentGenerator ABC for provider abstraction | The writer never imports from `bookforge.llm` directly. All LLM interaction goes through a single-method ABC that the application layer implements, keeping the writer testable and provider-agnostic. |
+| ADR-019 | Prompt composition from parts | Prompts are built from registered `SYSTEM_PARTS`/`USER_PARTS` dictionaries by key rather than hardcoded as template strings. Enables reuse, variation, and easy modification without string manipulation. |
+| ADR-020 | Separate writer modules per concern | Chapter writing, section writing, introductions, conclusions, glossary, references, code examples, and tables are each in their own module. The pipeline wires them together but any can be replaced independently. |
+
+---
+
 ## Error Handling Architecture
 
 ```mermaid

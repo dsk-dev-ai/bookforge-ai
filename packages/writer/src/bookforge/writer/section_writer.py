@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from bookforge.writer.models import (
-    BookDraft,
-    ChapterDraft,
     ContentGenerator,
-    SectionDraft,
+    DraftBook,
+    DraftChapter,
+    DraftSection,
     WritingConfig,
 )
 from bookforge.writer.prompt_builder import PromptBuilder
@@ -22,27 +22,29 @@ class SectionWriter:
 
     async def write_section(
         self,
-        section: SectionDraft,
+        section: DraftSection,
         chapter_title: str,
-        draft: BookDraft,
+        draft: DraftBook,
         generator: ContentGenerator,
         config: WritingConfig | None = None,
-    ) -> SectionDraft:
+    ) -> DraftSection:
         cfg = config or WritingConfig.default()
         research = getattr(draft, "research_summary", "")
-        system, user = self._prompt_builder.build_section_prompt(
-            book_title=draft.title,
+        template = self._prompt_builder.section_prompt(
+            topic=draft.topic,
+            title=draft.title,
             chapter_title=chapter_title,
             section_heading=section.heading,
-            section_goal=section.goal if hasattr(section, "goal") else "",
+            section_goal=getattr(section, "goal", ""),
             research=str(research),
             target_words=min(cfg.target_word_count, cfg.max_chunk_size_words),
         )
+        system, user = template.compose()
         messages = self._prompt_renderer.render(system, user)
         prompt = self._prompt_renderer.format_messages_for_provider(messages)
         content = await generator.generate(prompt, temperature=cfg.temperature)
         word_count = len(content.split())
-        return SectionDraft(
+        return DraftSection(
             heading=section.heading,
             content=content,
             subsections=section.subsections,
@@ -52,14 +54,14 @@ class SectionWriter:
 
     async def write_all_sections(
         self,
-        draft: BookDraft,
+        draft: DraftBook,
         generator: ContentGenerator,
         config: WritingConfig | None = None,
-    ) -> BookDraft:
+    ) -> DraftBook:
         cfg = config or WritingConfig.default()
-        updated_chapters: list[ChapterDraft] = []
+        updated_chapters: list[DraftChapter] = []
         for chapter in draft.chapters:
-            written_sections: list[SectionDraft] = []
+            written_sections: list[DraftSection] = []
             for section in chapter.sections:
                 result = await self.write_section(
                     section, chapter.title, draft, generator, cfg

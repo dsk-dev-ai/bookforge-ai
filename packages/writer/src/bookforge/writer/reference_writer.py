@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from bookforge.writer.models import (
-    BookDraft,
     ContentGenerator,
-    ReferenceDraft,
+    DraftBook,
+    DraftReferences,
     ReferenceEntry,
     WritingConfig,
 )
@@ -22,30 +22,32 @@ class ReferenceWriter:
 
     async def write_references(
         self,
-        draft: BookDraft,
+        draft: DraftBook,
         generator: ContentGenerator,
         references: list[dict[str, str]] | None = None,
         config: WritingConfig | None = None,
-    ) -> BookDraft:
+    ) -> DraftBook:
         cfg = config or WritingConfig.default()
         ref_list = references or self._extract_references(draft)
         if not ref_list:
             return draft
 
-        system, user = self._prompt_builder.build_reference_prompt(
+        template = self._prompt_builder.reference_prompt(
             topic=draft.topic,
+            title=draft.title,
             references=ref_list,
         )
+        system, user = template.compose()
         messages = self._prompt_renderer.render(system, user)
         prompt = self._prompt_renderer.format_messages_for_provider(messages)
         content = await generator.generate(prompt, temperature=cfg.temperature)
-        ref_draft = ReferenceDraft(
+        ref_draft = DraftReferences(
             entries=[ReferenceEntry(title=r.get("title", ""), content="", category=r.get("category", "general")) for r in ref_list],
             content=content,
         )
         return draft.model_copy(update={"references": ref_draft})
 
-    def _extract_references(self, draft: BookDraft) -> list[dict[str, str]]:
+    def _extract_references(self, draft: DraftBook) -> list[dict[str, str]]:
         refs: list[dict[str, str]] = []
         seen: set[str] = set()
         for ch in draft.chapters:

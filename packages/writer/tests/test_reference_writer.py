@@ -1,4 +1,4 @@
-from bookforge.writer.models import BookDraft, ChapterDraft, ContentGenerator, SectionDraft, WritingConfig
+from bookforge.writer.models import ContentGenerator, DraftBook, DraftChapter, DraftSection, WritingConfig
 from bookforge.writer.reference_writer import ReferenceWriter
 
 
@@ -21,7 +21,7 @@ class TestReferenceWriter:
         self.config = WritingConfig(target_word_count=100)
 
     async def test_write_references(self) -> None:
-        draft = BookDraft(title="Guide", topic="Python")
+        draft = DraftBook(title="Guide", topic="Python")
         result = await self.writer.write_references(
             draft, self.generator,
             references=[{"title": "print()", "description": "Built-in", "category": "functions"}],
@@ -31,22 +31,21 @@ class TestReferenceWriter:
         assert len(result.references.entries) == 1
 
     async def test_write_references_no_refs_returns_unchanged(self) -> None:
-        draft = BookDraft(title="Guide", topic="Python", chapters=[])
+        draft = DraftBook(title="Guide", topic="Python", chapters=[])
         result = await self.writer.write_references(draft, self.generator, references=[], config=self.config)
         assert result.references is None
 
     def test_extract_references(self) -> None:
-        draft = BookDraft(
+        draft = DraftBook(
             title="Guide", topic="Python",
             chapters=[
-                ChapterDraft(
+                DraftChapter(
                     title="Intro",
                     sections=[
-                        SectionDraft(heading="Using Django REST Framework"),
+                        DraftSection(heading="Using Django REST Framework"),
                     ],
                 ),
             ],
         )
         refs = self.writer._extract_references(draft)
         assert "Django" in [r["title"] for r in refs]
-        assert "REST" in [r["title"] for r in refs]

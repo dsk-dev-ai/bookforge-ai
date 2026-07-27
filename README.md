@@ -185,6 +185,7 @@ bookforge-ai/
 │   ├── rag/              # RAG and knowledge management
 │   ├── diagrams/         # Diagram generation
 │   ├── images/           # Image generation
+│   ├── writer/           # Writing engine (draft generation)
 │   └── prompts/          # Prompt template management
 ├── config/               # YAML configuration files
 ├── docs/                 # Architecture and design documentation
@@ -283,7 +284,7 @@ Markdown → PDF → EPUB → Completed Book
 | 05 — Configuration | Configuration system, environment loading, settings |
 | 06 — Research Engine | Research planning, caching, deduplication, ranking |
 | 07 — Book Planning | Book blueprint, chapter outlines, dependency graphs, learning paths |
-| 08 — Core Pipeline | Writing, review, markdown, PDF |
+| 08 — Writing Engine | Chapter/section generation, prompt composition, Markdown assembly, validation |
 | 09 — Production | API, web UI, deployment, monitoring |
 
 ---

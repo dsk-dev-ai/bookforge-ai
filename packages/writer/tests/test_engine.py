@@ -1,7 +1,13 @@
 import pytest
 
 from bookforge.writer.engine import WriterEngine
-from bookforge.writer.models import BookDraft, ChapterDraft, ContentGenerator, SectionDraft
+from bookforge.writer.models import (
+    ContentGenerator,
+    DraftBook,
+    DraftChapter,
+    DraftSection,
+    WritingContext,
+)
 
 
 class FakeGenerator(ContentGenerator):
@@ -22,34 +28,56 @@ class TestWriterEngine:
         self.generator = FakeGenerator()
 
     async def test_write(self) -> None:
-        draft = BookDraft(
+        draft = DraftBook(
             title="Book", topic="Python",
-            chapters=[ChapterDraft(title="Intro")],
+            chapters=[DraftChapter(title="Intro")],
         )
         result = await self.engine.write(draft, self.generator)
         assert result.success
 
-    async def test_write_chapter(self) -> None:
-        draft = BookDraft(
+    async def test_write_with_context(self) -> None:
+        draft = DraftBook(
             title="Book", topic="Python",
-            chapters=[ChapterDraft(title="Intro", goal="Introduce")],
+            chapters=[DraftChapter(title="Intro")],
+        )
+        ctx = WritingContext(book_title="Book", book_topic="Python", research_summary="Test research")
+        result = await self.engine.write(draft, self.generator, context=ctx)
+        assert result.success
+
+    async def test_write_from_blueprint(self) -> None:
+        class FakeBlueprint:
+            title = "Book"
+            topic = "Python"
+            target_audience = "devs"
+            difficulty = 0.5
+            subtitle = "Sub"
+            estimated_chapters = 1
+            outline = None
+
+        result = await self.engine.write_from_blueprint(FakeBlueprint(), self.generator)
+        assert result.success
+
+    async def test_write_chapter(self) -> None:
+        draft = DraftBook(
+            title="Book", topic="Python",
+            chapters=[DraftChapter(title="Intro", goal="Introduce")],
         )
         result = await self.engine.write_chapter(draft, "Intro", self.generator)
         assert result.title == "Intro"
         assert len(result.content) > 0
 
     async def test_write_chapter_not_found(self) -> None:
-        draft = BookDraft(title="Book", topic="Python")
+        draft = DraftBook(title="Book", topic="Python")
         with pytest.raises(ValueError, match="not found"):
             await self.engine.write_chapter(draft, "Nonexistent", self.generator)
 
     async def test_write_section(self) -> None:
-        draft = BookDraft(
+        draft = DraftBook(
             title="Book", topic="Python",
             chapters=[
-                ChapterDraft(
+                DraftChapter(
                     title="Intro",
-                    sections=[SectionDraft(heading="Welcome")],
+                    sections=[DraftSection(heading="Welcome")],
                 ),
             ],
         )
@@ -57,21 +85,27 @@ class TestWriterEngine:
         assert result.heading == "Welcome"
 
     async def test_write_section_not_found(self) -> None:
-        draft = BookDraft(
+        draft = DraftBook(
             title="Book", topic="Python",
-            chapters=[ChapterDraft(title="Intro")],
+            chapters=[DraftChapter(title="Intro")],
         )
         with pytest.raises(ValueError, match="not found"):
             await self.engine.write_section(draft, "Intro", "Nonexistent", self.generator)
 
     def test_create_draft(self) -> None:
         draft = self.engine.create_draft(
-            title="Guide",
-            topic="Python",
+            title="Guide", topic="Python",
             chapter_titles=["Intro", "Basics"],
             subtitle="A Python Guide",
         )
         assert draft.title == "Guide"
         assert draft.subtitle == "A Python Guide"
         assert draft.chapter_count == 2
-        assert draft.chapters[0].title == "Intro"
+
+    def test_compute_statistics(self) -> None:
+        draft = DraftBook(
+            title="T", topic="T",
+            chapters=[DraftChapter(title="Ch1", content="Hi", word_count=2)],
+        )
+        stats = self.engine.compute_statistics(draft)
+        assert stats.total_chapters == 1

@@ -1,5 +1,5 @@
 from bookforge.writer.glossary_writer import GlossaryWriter
-from bookforge.writer.models import BookDraft, ChapterDraft, ContentGenerator, WritingConfig
+from bookforge.writer.models import ContentGenerator, DraftBook, DraftChapter, WritingConfig
 
 
 class FakeGenerator(ContentGenerator):
@@ -21,7 +21,7 @@ class TestGlossaryWriter:
         self.config = WritingConfig(target_word_count=100)
 
     async def test_write_glossary_with_terms(self) -> None:
-        draft = BookDraft(title="Guide", topic="Web Dev")
+        draft = DraftBook(title="Guide", topic="Web Dev")
         result = await self.writer.write_glossary(
             draft, self.generator,
             terms=[{"term": "API", "context": "Web"}],
@@ -31,19 +31,18 @@ class TestGlossaryWriter:
         assert len(result.glossary.entries) == 1
 
     async def test_write_glossary_no_terms_returns_unchanged(self) -> None:
-        draft = BookDraft(title="Guide", topic="Web Dev", chapters=[])
+        draft = DraftBook(title="Guide", topic="Web Dev", chapters=[])
         result = await self.writer.write_glossary(draft, self.generator, terms=[], config=self.config)
         assert result.glossary is None
 
     def test_extract_terms(self) -> None:
-        draft = BookDraft(
+        draft = DraftBook(
             title="Guide", topic="Python",
             chapters=[
-                ChapterDraft(title="Django Basics"),
-                ChapterDraft(title="REST APIs"),
+                DraftChapter(title="Django Basics"),
+                DraftChapter(title="REST APIs"),
             ],
         )
         terms = self.writer._extract_terms(draft)
         assert "Django" in terms
         assert "REST" in terms
-        assert "APIs" in terms

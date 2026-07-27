@@ -9,10 +9,10 @@ from pydantic import BaseModel, Field
 from bookforge.writer.enums import DraftQuality, WritingStatus
 
 
-class SectionDraft(BaseModel):
+class DraftSection(BaseModel):
     heading: str = Field(description="Section heading")
     content: str = Field(default="", description="Section content in markdown")
-    subsections: list[SectionDraft] = Field(default_factory=list, description="Nested subsections")
+    subsections: list[DraftSection] = Field(default_factory=list, description="Nested subsections")
     word_count: int = Field(default=0, ge=0, description="Section word count")
     estimated_minutes: int = Field(default=0, ge=0, description="Estimated reading time")
 
@@ -21,11 +21,11 @@ class SectionDraft(BaseModel):
         return self.word_count + sum(s.total_word_count for s in self.subsections)
 
 
-class ChapterDraft(BaseModel):
+class DraftChapter(BaseModel):
     title: str = Field(description="Chapter title")
     goal: str = Field(default="", description="Chapter goal")
     content: str = Field(default="", description="Full chapter content in markdown")
-    sections: list[SectionDraft] = Field(default_factory=list, description="Chapter sections")
+    sections: list[DraftSection] = Field(default_factory=list, description="Chapter sections")
     word_count: int = Field(default=0, ge=0, description="Chapter word count")
     estimated_minutes: int = Field(default=0, ge=0, description="Estimated reading time")
     status: WritingStatus = Field(default=WritingStatus.PENDING, description="Writing status")
@@ -35,13 +35,13 @@ class ChapterDraft(BaseModel):
         return self.word_count + sum(s.total_word_count for s in self.sections)
 
 
-class FrontMatterDraft(BaseModel):
+class DraftFrontMatter(BaseModel):
     title: str = Field(description="Front matter title")
     content: str = Field(default="", description="Front matter content")
     word_count: int = Field(default=0, ge=0)
 
 
-class BackMatterDraft(BaseModel):
+class DraftBackMatter(BaseModel):
     title: str = Field(description="Back matter title")
     content: str = Field(default="", description="Back matter content")
     word_count: int = Field(default=0, ge=0)
@@ -53,7 +53,7 @@ class GlossaryEntry(BaseModel):
     context: str = Field(default="", description="Context where term is used")
 
 
-class GlossaryDraft(BaseModel):
+class DraftGlossary(BaseModel):
     entries: list[GlossaryEntry] = Field(default_factory=list, description="Glossary entries")
     content: str = Field(default="", description="Glossary markdown content")
 
@@ -64,20 +64,20 @@ class ReferenceEntry(BaseModel):
     category: str = Field(default="general", description="Reference category")
 
 
-class ReferenceDraft(BaseModel):
+class DraftReferences(BaseModel):
     entries: list[ReferenceEntry] = Field(default_factory=list, description="Reference entries")
     content: str = Field(default="", description="References markdown content")
 
 
-class BookDraft(BaseModel):
+class DraftBook(BaseModel):
     title: str = Field(description="Book title")
     subtitle: str | None = Field(default=None, description="Book subtitle")
     topic: str = Field(description="Book topic")
-    chapters: list[ChapterDraft] = Field(default_factory=list, description="Chapter drafts")
-    front_matter: list[FrontMatterDraft] = Field(default_factory=list, description="Front matter")
-    back_matter: list[BackMatterDraft] = Field(default_factory=list, description="Back matter")
-    glossary: GlossaryDraft | None = Field(default=None, description="Glossary")
-    references: ReferenceDraft | None = Field(default=None, description="References")
+    chapters: list[DraftChapter] = Field(default_factory=list, description="Chapter drafts")
+    front_matter: list[DraftFrontMatter] = Field(default_factory=list, description="Front matter")
+    back_matter: list[DraftBackMatter] = Field(default_factory=list, description="Back matter")
+    glossary: DraftGlossary | None = Field(default=None, description="Glossary")
+    references: DraftReferences | None = Field(default=None, description="References")
     word_count: int = Field(default=0, ge=0, description="Total word count")
     estimated_minutes: int = Field(default=0, ge=0, description="Total estimated reading time")
     quality: DraftQuality = Field(default=DraftQuality.DRAFT, description="Draft quality level")
@@ -121,6 +121,84 @@ class WritingConfig(BaseModel):
         return cls()
 
 
+class WritingContext(BaseModel):
+    book_title: str = Field(description="Book title")
+    book_topic: str = Field(description="Book topic")
+    target_audience: str = Field(default="developers", description="Target audience")
+    difficulty: float = Field(default=0.5, ge=0.0, le=1.0)
+    research_summary: str = Field(default="", description="Research summary for context")
+    key_concepts: list[str] = Field(default_factory=list, description="Key concepts to cover")
+    learning_objectives: list[str] = Field(default_factory=list, description="Learning objectives")
+    style_guidelines: str = Field(default="technical", description="Writing style")
+
+    @classmethod
+    def from_blueprint(
+        cls,
+        blueprint: Any,
+        research: Any | None = None,
+    ) -> WritingContext:
+        ctx = cls(
+            book_title=blueprint.title,
+            book_topic=blueprint.topic,
+            target_audience=getattr(blueprint, "target_audience", "developers"),
+            difficulty=getattr(blueprint, "difficulty", 0.5),
+        )
+        if research is not None:
+            ctx.research_summary = getattr(research, "summary", "")
+            ctx.key_concepts = [
+                getattr(c, "name", str(c)) for c in getattr(research, "key_concepts", [])
+            ]
+            ctx.learning_objectives = getattr(research, "learning_objectives", [])
+        return ctx
+
+
+class WritingSession(BaseModel):
+    session_id: str = Field(description="Session identifier")
+    context: WritingContext = Field(description="Writing context")
+    draft: DraftBook | None = Field(default=None, description="Current draft")
+    started_at: str = Field(default="", description="Session start timestamp")
+    updated_at: str = Field(default="", description="Last activity timestamp")
+    completed_at: str | None = Field(default=None, description="Completion timestamp")
+    status: WritingStatus = Field(default=WritingStatus.PENDING)
+
+
+class WritingStatistics(BaseModel):
+    total_chapters: int = Field(default=0)
+    written_chapters: int = Field(default=0)
+    total_sections: int = Field(default=0)
+    written_sections: int = Field(default=0)
+    total_word_count: int = Field(default=0)
+    total_estimated_minutes: int = Field(default=0)
+    validation_errors: int = Field(default=0)
+    validation_warnings: int = Field(default=0)
+
+    @classmethod
+    def from_draft(cls, draft: DraftBook, messages: list[ValidationMessage] | None = None) -> WritingStatistics:
+        msgs = messages or []
+        return cls(
+            total_chapters=draft.chapter_count,
+            written_chapters=sum(1 for c in draft.chapters if c.status == WritingStatus.COMPLETED),
+            total_sections=sum(len(c.sections) for c in draft.chapters),
+            written_sections=sum(1 for c in draft.chapters for s in c.sections if s.content),
+            total_word_count=draft.total_word_count,
+            total_estimated_minutes=draft.estimated_minutes,
+            validation_errors=sum(1 for m in msgs if m.severity == "error"),
+            validation_warnings=sum(1 for m in msgs if m.severity == "warning"),
+        )
+
+
+class WritingMetrics(BaseModel):
+    prompt_token_count: int = Field(default=0, description="Tokens used in prompts")
+    completion_token_count: int = Field(default=0, description="Tokens in completions")
+    total_llm_calls: int = Field(default=0, description="Number of LLM calls made")
+    total_latency_ms: float = Field(default=0.0, description="Total LLM latency")
+    average_latency_ms: float = Field(default=0.0, description="Average call latency")
+    chapters_generated: int = Field(default=0)
+    sections_generated: int = Field(default=0)
+    retry_count: int = Field(default=0, description="Number of retries")
+    failed_calls: int = Field(default=0)
+
+
 class ContentGenerator(ABC):
     @abstractmethod
     async def generate(self, prompt: str, **kwargs: Any) -> str:
@@ -138,7 +216,7 @@ class ContentGenerator(ABC):
 
 class WritingJob(BaseModel):
     id: str = Field(description="Job identifier")
-    draft: BookDraft = Field(description="Book draft being written")
+    draft: DraftBook = Field(description="Book draft being written")
     status: WritingStatus = Field(default=WritingStatus.PENDING, description="Job status")
     current_stage: str | None = Field(default=None, description="Current pipeline stage")
     errors: list[str] = Field(default_factory=list, description="Job errors")

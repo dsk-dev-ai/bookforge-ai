@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from bookforge.writer.models import BookDraft, ChapterDraft
+import re
+
+from bookforge.writer.models import DraftBook, DraftChapter
 
 
 class MarkdownAssembler:
-    def assemble(self, draft: BookDraft) -> str:
+    def assemble(self, draft: DraftBook) -> str:
         parts: list[str] = []
         parts.append(f"# {draft.title}")
         if draft.subtitle:
@@ -31,10 +33,10 @@ class MarkdownAssembler:
 
         return "\n\n".join(parts)
 
-    def assemble_chapter_markdown(self, chapter: ChapterDraft) -> str:
+    def assemble_chapter_markdown(self, chapter: DraftChapter) -> str:
         return self._assemble_chapter(chapter)
 
-    def _assemble_chapter(self, chapter: ChapterDraft) -> str:
+    def _assemble_chapter(self, chapter: DraftChapter) -> str:
         parts: list[str] = []
         if chapter.content:
             parts.append(chapter.content)
@@ -57,3 +59,29 @@ class MarkdownAssembler:
         for sub in section.subsections:
             parts.append(self._assemble_section(sub, level + 1))
         return "\n\n".join(parts)
+
+    def extract_headings(self, markdown: str) -> list[tuple[int, str]]:
+        headings: list[tuple[int, str]] = []
+        for line in markdown.split("\n"):
+            stripped = line.strip()
+            match = re.match(r"^(#{1,6})\s+(.+)$", stripped)
+            if match:
+                level = len(match.group(1))
+                text = match.group(2).strip()
+                headings.append((level, text))
+        return headings
+
+    def validate_markdown_structure(self, markdown: str) -> list[str]:
+        issues: list[str] = []
+        lines = markdown.split("\n")
+        in_code_block = False
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith("```"):
+                in_code_block = not in_code_block
+                if not in_code_block:
+                    pass
+            if not in_code_block and stripped.startswith("#"):
+                if not re.match(r"^#{1,6}\s+\S", stripped):
+                    issues.append(f"Line {i + 1}: Invalid heading format: {stripped}")
+        return issues

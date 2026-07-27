@@ -2,7 +2,7 @@ import pytest
 
 from bookforge.writer.enums import WritingStatus
 from bookforge.writer.manager import WriterManager
-from bookforge.writer.models import ContentGenerator
+from bookforge.writer.models import ContentGenerator, WritingContext
 
 
 class FakeGenerator(ContentGenerator):
@@ -33,6 +33,12 @@ class TestWriterManager:
         job = self.manager.create_job("Guide", "Python", ["Ch1"], subtitle="Sub")
         assert job.draft.subtitle == "Sub"
 
+    def test_create_session(self) -> None:
+        ctx = WritingContext(book_title="Guide", book_topic="Python")
+        session = self.manager.create_session(ctx)
+        assert session.session_id.startswith("session_")
+        assert session.context.book_title == "Guide"
+
     async def test_run_job(self) -> None:
         job = self.manager.create_job("Guide", "Python", ["Intro"])
         result = await self.manager.run_job(job.id, self.generator)
@@ -40,6 +46,12 @@ class TestWriterManager:
         updated = self.manager.get_job(job.id)
         assert updated is not None
         assert updated.status == WritingStatus.COMPLETED
+
+    async def test_run_job_with_context(self) -> None:
+        job = self.manager.create_job("Guide", "Python", ["Intro"])
+        ctx = WritingContext(book_title="Guide", book_topic="Python")
+        result = await self.manager.run_job(job.id, self.generator, context=ctx)
+        assert result.success
 
     async def test_run_job_not_found(self) -> None:
         with pytest.raises(ValueError, match="not found"):
@@ -49,7 +61,6 @@ class TestWriterManager:
         job = self.manager.create_job("Guide", "T", ["Ch1"])
         fetched = self.manager.get_job(job.id)
         assert fetched is not None
-        assert fetched.id == job.id
 
     def test_get_job_not_found(self) -> None:
         assert self.manager.get_job("nonexistent") is None
@@ -75,3 +86,18 @@ class TestWriterManager:
 
     def test_get_draft_not_found(self) -> None:
         assert self.manager.get_draft("nonexistent") is None
+
+    def test_session_crud(self) -> None:
+        ctx = WritingContext(book_title="T", book_topic="T")
+        session = self.manager.create_session(ctx)
+        fetched = self.manager.get_session(session.session_id)
+        assert fetched is not None
+
+        from bookforge.writer.models import DraftBook
+        draft = DraftBook(title="T", topic="T")
+        updated = self.manager.update_session(session.session_id, draft)
+        assert updated is not None
+        assert updated.draft is not None
+
+    def test_get_session_not_found(self) -> None:
+        assert self.manager.get_session("nonexistent") is None

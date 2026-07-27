@@ -4,17 +4,17 @@ import json
 from typing import Any
 
 from bookforge.writer.assembler import MarkdownAssembler
-from bookforge.writer.models import BookDraft
+from bookforge.writer.models import DraftBook
 
 
 class WritingExporter:
     def __init__(self, assembler: MarkdownAssembler | None = None) -> None:
         self._assembler = assembler or MarkdownAssembler()
 
-    def to_markdown(self, draft: BookDraft) -> str:
+    def to_markdown(self, draft: DraftBook) -> str:
         return self._assembler.assemble(draft)
 
-    def to_dict(self, draft: BookDraft) -> dict[str, Any]:
+    def to_dict(self, draft: DraftBook) -> dict[str, Any]:
         return {
             "title": draft.title,
             "subtitle": draft.subtitle,
@@ -36,10 +36,10 @@ class WritingExporter:
             "has_references": draft.references is not None,
         }
 
-    def to_json(self, draft: BookDraft, indent: int = 2) -> str:
+    def to_json(self, draft: DraftBook, indent: int = 2) -> str:
         return json.dumps(self.to_dict(draft), indent=indent, default=str)
 
-    def to_file(self, draft: BookDraft, path: str) -> str:
+    def to_file(self, draft: DraftBook, path: str) -> str:
         markdown = self.to_markdown(draft)
         with open(path, "w") as f:
             f.write(markdown)

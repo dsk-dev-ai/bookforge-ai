@@ -1,4 +1,4 @@
-from bookforge.writer.models import BookDraft, ChapterDraft, ContentGenerator, SectionDraft, WritingConfig
+from bookforge.writer.models import ContentGenerator, DraftBook, DraftChapter, DraftSection, WritingConfig
 from bookforge.writer.section_writer import SectionWriter
 
 
@@ -21,8 +21,8 @@ class TestSectionWriter:
         self.config = WritingConfig(target_word_count=100)
 
     async def test_write_section(self) -> None:
-        draft = BookDraft(title="Book", topic="Python")
-        section = SectionDraft(heading="Parameters")
+        draft = DraftBook(title="Book", topic="Python")
+        section = DraftSection(heading="Parameters")
         result = await self.writer.write_section(
             section, "Functions", draft, self.generator, self.config,
         )
@@ -30,14 +30,14 @@ class TestSectionWriter:
         assert len(result.content) > 0
 
     async def test_write_all_sections(self) -> None:
-        draft = BookDraft(
+        draft = DraftBook(
             title="Book", topic="Python",
             chapters=[
-                ChapterDraft(
+                DraftChapter(
                     title="Functions",
                     sections=[
-                        SectionDraft(heading="Parameters"),
-                        SectionDraft(heading="Return Values"),
+                        DraftSection(heading="Parameters"),
+                        DraftSection(heading="Return Values"),
                     ],
                 ),
             ],

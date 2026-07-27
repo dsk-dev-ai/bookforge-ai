@@ -1,135 +1,216 @@
 from __future__ import annotations
 
-SYSTEM_TEMPLATES: dict[str, str] = {
-    "chapter": (
-        "You are an expert technical author writing a book chapter. "
-        "Write clear, well-structured content in markdown format. "
-        "Use proper heading hierarchy (## for sections, ### for subsections). "
-        "Include code blocks with language annotations where appropriate. "
-        "Keep explanations practical and actionable."
-    ),
-    "section": (
-        "You are an expert technical author writing a section of a book chapter. "
-        "Write focused, detailed content in markdown format. "
-        "Use ### for subsections if needed. "
-        "Include examples and practical explanations."
-    ),
-    "glossary": (
-        "You are an expert technical author creating glossary definitions. "
-        "Provide clear, concise definitions for each term. "
-        "Include context about how the term is used in the subject area."
-    ),
-    "reference": (
-        "You are an expert technical author writing reference documentation. "
-        "Provide precise technical details, usage examples, and important notes. "
-        "Format in markdown with code blocks where applicable."
-    ),
+from typing import Any
+
+
+class PromptTemplate:
+    def __init__(self, system: str, user: str) -> None:
+        self.system = system
+        self.user = user
+
+    def compose(self, **variables: Any) -> tuple[str, str]:
+        return (
+            self.system.format(**variables),
+            self.user.format(**variables),
+        )
+
+
+SYSTEM_PARTS: dict[str, str] = {
+    "role": "You are an expert technical author writing a {style} book.",
+    "format": "Write clear, well-structured content in markdown format.",
+    "headings": "Use proper heading hierarchy. Use ## for sections, ### for subsections.",
+    "code": "Include code blocks with language annotations where appropriate.",
+    "practical": "Keep explanations practical and actionable.",
+    "glossary": "Provide clear, concise definitions for each term.",
+    "reference": "Provide precise technical details, usage examples, and important notes.",
 }
 
-USER_TEMPLATES: dict[str, str] = {
-    "chapter": (
-        "Book topic: {topic}\n"
-        "Chapter title: {title}\n"
-        "Chapter goal: {goal}\n"
-        "Target audience: {audience}\n"
-        "Research context: {research}\n"
-        "Target word count: {target_words}\n"
-        "\n"
-        "Write the full chapter content in markdown below:"
-    ),
-    "section": (
-        "Book: {book_title}\n"
-        "Chapter: {chapter_title}\n"
-        "Section heading: {section_heading}\n"
-        "Section goal: {section_goal}\n"
-        "Research context: {research}\n"
-        "Target word count: {target_words}\n"
-        "\n"
-        "Write the section content in markdown below:"
-    ),
-    "glossary": (
-        "Book topic: {topic}\n"
-        "\n"
-        "Create glossary definitions for the following terms:\n"
-        "{terms}\n"
-        "\n"
-        "Format each entry as:\n"
-        "**term**  \n"
-        "definition  \n"
-        "*Context: where it appears*"
-    ),
-    "reference": (
-        "Book topic: {topic}\n"
-        "\n"
-        "Write reference documentation for:\n"
-        "{references}\n"
-        "\n"
-        "Include API signatures, usage examples, and notes."
-    ),
+USER_PARTS: dict[str, str] = {
+    "context": "Book topic: {topic}\nTitle: {title}",
+    "audience": "Target audience: {audience}",
+    "chapter_context": "Chapter title: {chapter_title}\nChapter goal: {chapter_goal}",
+    "section_context": "Section heading: {section_heading}\nSection goal: {section_goal}",
+    "research": "Research context: {research}",
+    "word_count": "Target word count: {target_words}",
+    "terms": "Create glossary definitions for the following terms:\n{terms}",
+    "references": "Write reference documentation for:\n{references}",
+    "code_info": "Language: {language}\nDescription: {description}",
+    "table_info": "Create a table with the following columns: {columns}\nDescription: {description}",
 }
 
 
 class PromptBuilder:
-    def build_chapter_prompt(
+    def build_prompt(
+        self,
+        system_keys: list[str],
+        user_keys: list[str],
+        **variables: Any,
+    ) -> tuple[str, str]:
+        system_parts = [SYSTEM_PARTS[k] for k in system_keys if k in SYSTEM_PARTS]
+        system = " ".join(system_parts)
+
+        user_parts = [USER_PARTS[k] for k in user_keys if k in USER_PARTS]
+        user = "\n".join(user_parts)
+
+        extra = variables.pop("extra_user_instructions", "")
+        if extra:
+            user = f"{user}\n{extra}"
+
+        system = system.format(**variables)
+        user = user.format(**variables)
+        return system, user
+
+    def chapter_prompt(
         self,
         topic: str,
         title: str,
-        goal: str,
+        chapter_title: str,
+        chapter_goal: str = "",
         audience: str = "developers",
         research: str = "",
         target_words: int = 800,
-    ) -> tuple[str, str]:
-        system = SYSTEM_TEMPLATES["chapter"]
-        user = USER_TEMPLATES["chapter"].format(
-            topic=topic,
-            title=title,
-            goal=goal,
-            audience=audience,
-            research=research,
-            target_words=target_words,
+        style: str = "technical",
+    ) -> PromptTemplate:
+        system_keys = ["role", "format", "headings", "code", "practical"]
+        user_keys = ["context", "audience", "chapter_context", "research", "word_count"]
+        system, user = self.build_prompt(
+            system_keys, user_keys,
+            style=style, topic=topic, title=title,
+            chapter_title=chapter_title, chapter_goal=chapter_goal,
+            audience=audience, research=research, target_words=target_words,
         )
-        return system, user
+        return PromptTemplate(system, user)
 
-    def build_section_prompt(
-        self,
-        book_title: str,
-        chapter_title: str,
-        section_heading: str,
-        section_goal: str,
-        research: str = "",
-        target_words: int = 300,
-    ) -> tuple[str, str]:
-        system = SYSTEM_TEMPLATES["section"]
-        user = USER_TEMPLATES["section"].format(
-            book_title=book_title,
-            chapter_title=chapter_title,
-            section_heading=section_heading,
-            section_goal=section_goal,
-            research=research,
-            target_words=target_words,
-        )
-        return system, user
-
-    def build_glossary_prompt(
+    def section_prompt(
         self,
         topic: str,
+        title: str,
+        chapter_title: str,
+        section_heading: str,
+        section_goal: str = "",
+        research: str = "",
+        target_words: int = 300,
+        style: str = "technical",
+    ) -> PromptTemplate:
+        system_keys = ["role", "format", "headings", "practical"]
+        user_keys = ["context", "chapter_context", "section_context", "research", "word_count"]
+        system, user = self.build_prompt(
+            system_keys, user_keys,
+            style=style, topic=topic, title=title,
+            chapter_title=chapter_title, chapter_goal="",
+            section_heading=section_heading, section_goal=section_goal,
+            research=research, target_words=target_words,
+        )
+        return PromptTemplate(system, user)
+
+    def glossary_prompt(
+        self,
+        topic: str,
+        title: str,
         terms: list[dict[str, str]],
-    ) -> tuple[str, str]:
-        system = SYSTEM_TEMPLATES["glossary"]
+        style: str = "technical",
+    ) -> PromptTemplate:
+        system_keys = ["role", "glossary"]
         terms_text = "\n".join(
             f"- {t.get('term', '')}: {t.get('context', '')}" for t in terms
         )
-        user = USER_TEMPLATES["glossary"].format(topic=topic, terms=terms_text)
-        return system, user
+        system, user = self.build_prompt(
+            system_keys, ["context", "terms"],
+            style=style, topic=topic, title=title,
+            terms=terms_text,
+        )
+        return PromptTemplate(system, user)
 
-    def build_reference_prompt(
+    def reference_prompt(
         self,
         topic: str,
+        title: str,
         references: list[dict[str, str]],
-    ) -> tuple[str, str]:
-        system = SYSTEM_TEMPLATES["reference"]
+        style: str = "technical",
+    ) -> PromptTemplate:
+        system_keys = ["role", "reference"]
         refs_text = "\n".join(
             f"- {r.get('title', '')}: {r.get('description', '')}" for r in references
         )
-        user = USER_TEMPLATES["reference"].format(topic=topic, references=refs_text)
-        return system, user
+        system, user = self.build_prompt(
+            system_keys, ["context", "references"],
+            style=style, topic=topic, title=title,
+            references=refs_text,
+        )
+        return PromptTemplate(system, user)
+
+    def code_example_prompt(
+        self,
+        topic: str,
+        title: str,
+        language: str,
+        description: str,
+        style: str = "technical",
+    ) -> PromptTemplate:
+        system_keys = ["role", "format", "code", "practical"]
+        user_keys = ["context", "code_info"]
+        system, user = self.build_prompt(
+            system_keys, user_keys,
+            style=style, topic=topic, title=title,
+            language=language, description=description,
+        )
+        return PromptTemplate(system, user)
+
+    def table_prompt(
+        self,
+        topic: str,
+        title: str,
+        columns: str,
+        description: str,
+        style: str = "technical",
+    ) -> PromptTemplate:
+        system_keys = ["role", "format", "practical"]
+        user_keys = ["context", "table_info"]
+        system, user = self.build_prompt(
+            system_keys, user_keys,
+            style=style, topic=topic, title=title,
+            columns=columns, description=description,
+        )
+        return PromptTemplate(system, user)
+
+    def introduction_prompt(
+        self,
+        topic: str,
+        title: str,
+        chapter_title: str,
+        chapter_goal: str = "",
+        research: str = "",
+        target_words: int = 400,
+        style: str = "technical",
+    ) -> PromptTemplate:
+        system_keys = ["role", "format", "practical"]
+        user_keys = ["context", "chapter_context", "research", "word_count"]
+        system, user = self.build_prompt(
+            system_keys, user_keys,
+            style=style, topic=topic, title=title,
+            chapter_title=chapter_title, chapter_goal=chapter_goal,
+            research=research, target_words=target_words,
+            extra_user_instructions="Write an engaging introduction that sets up the chapter.",
+        )
+        return PromptTemplate(system, user)
+
+    def conclusion_prompt(
+        self,
+        topic: str,
+        title: str,
+        chapter_title: str,
+        chapter_summary: str = "",
+        style: str = "technical",
+    ) -> PromptTemplate:
+        system_keys = ["role", "format", "practical"]
+        system, user = self.build_prompt(
+            system_keys, ["context", "chapter_context"],
+            style=style, topic=topic, title=title,
+            chapter_title=chapter_title, chapter_goal="",
+            extra_user_instructions=(
+                f"Write a conclusion for the chapter '{chapter_title}'.\n"
+                f"Chapter summary: {chapter_summary}\n"
+                "Summarize key takeaways and preview what comes next."
+            ),
+        )
+        return PromptTemplate(system, user)

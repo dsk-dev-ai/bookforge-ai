@@ -3,7 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 
 from bookforge.writer.enums import WritingStatus
-from bookforge.writer.models import BookDraft, ChapterDraft, ContentGenerator, WritingConfig, WritingJob
+from bookforge.writer.models import (
+    ContentGenerator,
+    DraftBook,
+    DraftChapter,
+    WritingConfig,
+    WritingContext,
+    WritingJob,
+    WritingSession,
+)
 from bookforge.writer.pipeline import WriterPipeline, WriterPipelineResult
 
 
@@ -16,6 +24,7 @@ class WriterManager:
         self._pipeline = pipeline or WriterPipeline()
         self._config = config or WritingConfig.default()
         self._jobs: dict[str, WritingJob] = {}
+        self._sessions: dict[str, WritingSession] = {}
         self._job_counter: int = 0
 
     def create_job(
@@ -27,8 +36,8 @@ class WriterManager:
     ) -> WritingJob:
         self._job_counter += 1
         job_id = f"job_{self._job_counter}"
-        chapters = [ChapterDraft(title=t) for t in chapter_titles]
-        draft = BookDraft(title=title, subtitle=subtitle, topic=topic, chapters=chapters)
+        chapters = [DraftChapter(title=t) for t in chapter_titles]
+        draft = DraftBook(title=title, subtitle=subtitle, topic=topic, chapters=chapters)
         now = datetime.now().isoformat()
         job = WritingJob(
             id=job_id,
@@ -40,18 +49,31 @@ class WriterManager:
         self._jobs[job_id] = job
         return job
 
+    def create_session(self, context: WritingContext) -> WritingSession:
+        session_id = f"session_{len(self._sessions) + 1}"
+        now = datetime.now().isoformat()
+        session = WritingSession(
+            session_id=session_id,
+            context=context,
+            started_at=now,
+            updated_at=now,
+        )
+        self._sessions[session_id] = session
+        return session
+
     async def run_job(
         self,
         job_id: str,
         generator: ContentGenerator,
         config: WritingConfig | None = None,
+        context: WritingContext | None = None,
     ) -> WriterPipelineResult:
         job = self._jobs.get(job_id)
         if job is None:
             raise ValueError(f"Writing job '{job_id}' not found")
 
         cfg = config or self._config
-        result = await self._pipeline.run(job.draft, generator, cfg)
+        result = await self._pipeline.run(job.draft, generator, cfg, context=context)
 
         updated_job = job.model_copy(update={
             "draft": result.draft,
@@ -75,6 +97,20 @@ class WriterManager:
             return True
         return False
 
-    def get_draft(self, job_id: str) -> BookDraft | None:
+    def get_draft(self, job_id: str) -> DraftBook | None:
         job = self._jobs.get(job_id)
         return job.draft if job else None
+
+    def get_session(self, session_id: str) -> WritingSession | None:
+        return self._sessions.get(session_id)
+
+    def update_session(self, session_id: str, draft: DraftBook) -> WritingSession | None:
+        session = self._sessions.get(session_id)
+        if session is None:
+            return None
+        updated = session.model_copy(update={
+            "draft": draft,
+            "updated_at": datetime.now().isoformat(),
+        })
+        self._sessions[session_id] = updated
+        return updated
