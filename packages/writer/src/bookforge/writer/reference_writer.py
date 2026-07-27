@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from bookforge.writer.models import (
     ContentGenerator,
     DraftBook,
@@ -28,9 +30,15 @@ class ReferenceWriter:
         config: WritingConfig | None = None,
     ) -> DraftBook:
         cfg = config or WritingConfig.default()
-        ref_list = references or self._extract_references(draft)
-        if not ref_list:
-            return draft
+        if references is not None:
+            if not references:
+                return draft
+            ref_list = references
+        else:
+            extracted = self._extract_references(draft)
+            if not extracted:
+                return draft
+            ref_list = extracted
 
         template = self._prompt_builder.reference_prompt(
             topic=draft.topic,
@@ -52,10 +60,20 @@ class ReferenceWriter:
         seen: set[str] = set()
         for ch in draft.chapters:
             for sec in ch.sections:
-                words = sec.heading.split()
-                for w in words:
-                    clean = w.strip(".,;:!?")
-                    if clean and clean[0].isupper() and clean.lower() not in seen and len(clean) > 3:
-                        seen.add(clean.lower())
-                        refs.append({"title": clean, "description": "", "category": "general"})
+                self._extract_from_section(sec, seen, refs)
         return refs
+
+    def _extract_from_section(
+        self,
+        section: Any,
+        seen: set[str],
+        refs: list[dict[str, str]],
+    ) -> None:
+        words = section.heading.split()
+        for w in words:
+            clean = w.strip(".,;:!?")
+            if clean and clean[0].isupper() and clean.lower() not in seen and len(clean) > 3:
+                seen.add(clean.lower())
+                refs.append({"title": clean, "description": "", "category": "general"})
+        for sub in section.subsections:
+            self._extract_from_section(sub, seen, refs)

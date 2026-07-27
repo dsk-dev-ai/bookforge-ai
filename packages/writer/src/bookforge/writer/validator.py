@@ -37,7 +37,7 @@ class ContentValidator:
         msgs: list[ValidationMessage] = []
         for ch in draft.chapters:
             for sec in ch.sections:
-                if not sec.content:
+                if not sec.content and not sec.subsections:
                     msgs.append(
                         ValidationMessage(
                             message=f"Section '{sec.heading}' in chapter '{ch.title}' has no content",
@@ -55,7 +55,7 @@ class ContentValidator:
         msgs: list[ValidationMessage],
     ) -> None:
         for sub in section.subsections:
-            if not sub.content:
+            if not sub.content and not sub.subsections:
                 msgs.append(
                     ValidationMessage(
                         message=f"Subsection '{sub.heading}' in chapter '{chapter_title}' has no content",

@@ -71,6 +71,19 @@ class WriterEngine:
         writer = ChapterWriter()
         return await writer.write_chapter(chapter, draft, generator, config or self._config)
 
+    def _find_section(
+        self,
+        sections: list[DraftSection],
+        heading: str,
+    ) -> DraftSection | None:
+        for s in sections:
+            if s.heading == heading:
+                return s
+            found = self._find_section(s.subsections, heading)
+            if found is not None:
+                return found
+        return None
+
     async def write_section(
         self,
         draft: DraftBook,
@@ -84,7 +97,7 @@ class WriterEngine:
         chapter = next((c for c in draft.chapters if c.title == chapter_title), None)
         if chapter is None:
             raise ValueError(f"Chapter '{chapter_title}' not found in draft")
-        section = next((s for s in chapter.sections if s.heading == section_heading), None)
+        section = self._find_section(chapter.sections, section_heading)
         if section is None:
             raise ValueError(f"Section '{section_heading}' not found in chapter '{chapter_title}'")
         writer = SectionWriter()

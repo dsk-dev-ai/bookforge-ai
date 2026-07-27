@@ -41,6 +41,6 @@ class WritingExporter:
 
     def to_file(self, draft: DraftBook, path: str) -> str:
         markdown = self.to_markdown(draft)
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(markdown)
         return path

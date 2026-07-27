@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from bookforge.writer.enums import DraftQuality, WritingStatus
+from bookforge.writer.enums import DraftQuality, ValidationSeverity, WritingStatus
 
 
 class DraftSection(BaseModel):
@@ -89,8 +89,7 @@ class DraftBook(BaseModel):
 
     @property
     def total_word_count(self) -> int:
-        wc = self.word_count
-        wc += sum(c.total_word_count for c in self.chapters)
+        wc = sum(c.total_word_count for c in self.chapters)
         wc += sum(f.word_count for f in self.front_matter)
         wc += sum(b.word_count for b in self.back_matter)
         if self.glossary:
@@ -102,7 +101,7 @@ class DraftBook(BaseModel):
 
 class ValidationMessage(BaseModel):
     message: str = Field(description="Validation message")
-    severity: str = Field(default="warning", description="Severity level")
+    severity: ValidationSeverity = Field(default=ValidationSeverity.WARNING, description="Severity level")
     location: str | None = Field(default=None, description="Where the issue was found")
 
 
@@ -115,6 +114,15 @@ class WritingConfig(BaseModel):
     min_chunk_size_words: int = Field(default=500, ge=100, le=5000, description="Min generation chunk")
     max_chunk_size_words: int = Field(default=2000, ge=500, le=10000, description="Max generation chunk")
     target_word_count: int = Field(default=800, ge=100, le=10000, description="Target words per section")
+
+    @model_validator(mode="after")
+    def _chunk_sizes_consistent(self) -> WritingConfig:
+        if self.min_chunk_size_words > self.max_chunk_size_words:
+            raise ValueError(
+                f"min_chunk_size_words ({self.min_chunk_size_words}) must be ≤ "
+                f"max_chunk_size_words ({self.max_chunk_size_words})"
+            )
+        return self
 
     @classmethod
     def default(cls) -> WritingConfig:

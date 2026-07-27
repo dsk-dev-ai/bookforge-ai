@@ -72,18 +72,30 @@ class WriterManager:
         if job is None:
             raise ValueError(f"Writing job '{job_id}' not found")
 
-        cfg = config or self._config
-        result = await self._pipeline.run(job.draft, generator, cfg, context=context)
-
-        updated_job = job.model_copy(update={
-            "draft": result.draft,
-            "status": WritingStatus.COMPLETED if result.success else WritingStatus.FAILED,
-            "errors": [m.message for m in result.validation_messages if getattr(m, "severity", "warning") == "error"],
-            "updated_at": datetime.now().isoformat(),
+        now = datetime.now().isoformat()
+        self._jobs[job_id] = job.model_copy(update={
+            "status": WritingStatus.GENERATING,
+            "updated_at": now,
         })
-        self._jobs[job_id] = updated_job
 
-        return result
+        try:
+            cfg = config or self._config
+            result = await self._pipeline.run(job.draft, generator, cfg, context=context)
+            updated_job = job.model_copy(update={
+                "draft": result.draft,
+                "status": WritingStatus.COMPLETED if result.success else WritingStatus.FAILED,
+                "errors": [m.message for m in result.validation_messages if getattr(m, "severity", "warning") == "error"],
+                "updated_at": datetime.now().isoformat(),
+            })
+            self._jobs[job_id] = updated_job
+            return result
+        except Exception as exc:
+            self._jobs[job_id] = job.model_copy(update={
+                "status": WritingStatus.FAILED,
+                "errors": [str(exc)],
+                "updated_at": datetime.now().isoformat(),
+            })
+            raise
 
     def get_job(self, job_id: str) -> WritingJob | None:
         return self._jobs.get(job_id)

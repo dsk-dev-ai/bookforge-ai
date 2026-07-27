@@ -40,12 +40,13 @@ class MarkdownAssembler:
         parts: list[str] = []
         if chapter.content:
             parts.append(chapter.content)
-        else:
+        if chapter.sections:
+            for section in chapter.sections:
+                parts.append(self._assemble_section(section, 3))
+        if not chapter.content and not chapter.sections:
             parts.append(f"## {chapter.title}")
             if chapter.goal:
                 parts.append(f"\n> {chapter.goal}\n")
-            for section in chapter.sections:
-                parts.append(self._assemble_section(section, 3))
         return "\n\n".join(parts)
 
     def _assemble_section(self, section, level: int = 3) -> str:

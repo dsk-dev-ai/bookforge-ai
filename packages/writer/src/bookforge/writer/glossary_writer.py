@@ -28,9 +28,15 @@ class GlossaryWriter:
         config: WritingConfig | None = None,
     ) -> DraftBook:
         cfg = config or WritingConfig.default()
-        term_list = terms or [{"term": t, "context": ""} for t in self._extract_terms(draft)]
-        if not term_list:
-            return draft
+        if terms is not None:
+            if not terms:
+                return draft
+            term_list = terms
+        else:
+            extracted = self._extract_terms(draft)
+            if not extracted:
+                return draft
+            term_list = [{"term": t, "context": ""} for t in extracted]
 
         template = self._prompt_builder.glossary_prompt(
             topic=draft.topic,

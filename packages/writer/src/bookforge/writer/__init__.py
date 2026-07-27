@@ -4,7 +4,7 @@ from bookforge.writer.code_example_writer import CodeExampleWriter
 from bookforge.writer.conclusion_writer import ConclusionWriter
 from bookforge.writer.engine import WriterEngine
 from bookforge.writer.enums import DraftQuality, ValidationSeverity, WritingStage, WritingStatus
-from bookforge.writer.exporter import WritingExporter  # noqa: F401
+from bookforge.writer.exporter import WritingExporter
 from bookforge.writer.glossary_writer import GlossaryWriter
 from bookforge.writer.introduction_writer import IntroductionWriter
 from bookforge.writer.manager import WriterManager
@@ -63,12 +63,12 @@ __all__ = [
     "ValidationMessage",
     "ValidationSeverity",
     "WriterEngine",
-    "WriterExporter",
     "WriterManager",
     "WriterPipeline",
     "WriterPipelineResult",
     "WritingConfig",
     "WritingContext",
+    "WritingExporter",
     "WritingJob",
     "WritingMetrics",
     "WritingSession",
