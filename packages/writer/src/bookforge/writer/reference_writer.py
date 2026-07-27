@@ -1,0 +1,59 @@
+from __future__ import annotations
+
+from bookforge.writer.models import (
+    BookDraft,
+    ContentGenerator,
+    ReferenceDraft,
+    ReferenceEntry,
+    WritingConfig,
+)
+from bookforge.writer.prompt_builder import PromptBuilder
+from bookforge.writer.prompt_renderer import PromptRenderer
+
+
+class ReferenceWriter:
+    def __init__(
+        self,
+        prompt_builder: PromptBuilder | None = None,
+        prompt_renderer: PromptRenderer | None = None,
+    ) -> None:
+        self._prompt_builder = prompt_builder or PromptBuilder()
+        self._prompt_renderer = prompt_renderer or PromptRenderer()
+
+    async def write_references(
+        self,
+        draft: BookDraft,
+        generator: ContentGenerator,
+        references: list[dict[str, str]] | None = None,
+        config: WritingConfig | None = None,
+    ) -> BookDraft:
+        cfg = config or WritingConfig.default()
+        ref_list = references or self._extract_references(draft)
+        if not ref_list:
+            return draft
+
+        system, user = self._prompt_builder.build_reference_prompt(
+            topic=draft.topic,
+            references=ref_list,
+        )
+        messages = self._prompt_renderer.render(system, user)
+        prompt = self._prompt_renderer.format_messages_for_provider(messages)
+        content = await generator.generate(prompt, temperature=cfg.temperature)
+        ref_draft = ReferenceDraft(
+            entries=[ReferenceEntry(title=r.get("title", ""), content="", category=r.get("category", "general")) for r in ref_list],
+            content=content,
+        )
+        return draft.model_copy(update={"references": ref_draft})
+
+    def _extract_references(self, draft: BookDraft) -> list[dict[str, str]]:
+        refs: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for ch in draft.chapters:
+            for sec in ch.sections:
+                words = sec.heading.split()
+                for w in words:
+                    clean = w.strip(".,;:!?")
+                    if clean and clean[0].isupper() and clean.lower() not in seen and len(clean) > 3:
+                        seen.add(clean.lower())
+                        refs.append({"title": clean, "description": "", "category": "general"})
+        return refs
