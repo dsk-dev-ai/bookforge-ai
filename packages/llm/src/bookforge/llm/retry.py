@@ -4,17 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import random
-import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import ParamSpec, TypeVar
 
 from bookforge.llm.errors import (
     AuthenticationError,
     ConfigurationError,
     ProviderError,
-    ProviderTimeout,
-    RateLimitError,
 )
 
 P = ParamSpec("P")
@@ -48,13 +45,7 @@ class RetryPolicy:
         """
         if isinstance(error, (AuthenticationError, ConfigurationError)):
             return False
-        if isinstance(error, ProviderTimeout):
-            return True
-        if isinstance(error, RateLimitError):
-            return True
-        if isinstance(error, ProviderError):
-            return True
-        return False
+        return bool(isinstance(error, ProviderError))
 
     def delay(self, attempt: int) -> float:
         """Calculate the delay before the next retry.
@@ -70,10 +61,10 @@ class RetryPolicy:
         return backoff + random.uniform(-jitter_amount, jitter_amount)
 
 
-async def with_retry(
+async def with_retry[**P, R](
     operation: Callable[P, Awaitable[R]],
-    *args: P.args,
     policy: RetryPolicy | None = None,
+    *args: P.args,
     **kwargs: P.kwargs,
 ) -> R:
     """Execute an async operation with retry and backoff.

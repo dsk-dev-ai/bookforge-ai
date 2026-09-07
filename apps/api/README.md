@@ -1,5 +1,8 @@
 # `@bookforge/api`
 
+> **Status: planned** — this service is specified in `docs/ARCHITECTURE.md` for a future phase (Phase 05). No implementation ships yet. See [docs/ROADMAP.md](../../docs/ROADMAP.md).
+
+
 FastAPI REST API service.
 
 ## Responsibilities

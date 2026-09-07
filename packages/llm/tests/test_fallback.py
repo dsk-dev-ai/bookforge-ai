@@ -1,11 +1,17 @@
 """Tests for fallback behaviour through the provider manager."""
 
-import pytest
 
 from bookforge.llm.base import BaseProvider
 from bookforge.llm.config_loader import RuntimeConfig
 from bookforge.llm.manager import ProviderManager
-from bookforge.llm.models import ChatConfig, ChatResponse, HealthStatus, Message, MessageRole, TokenUsage
+from bookforge.llm.models import (
+    ChatConfig,
+    ChatResponse,
+    HealthStatus,
+    Message,
+    MessageRole,
+    TokenUsage,
+)
 
 
 class _AlwaysFailsProvider(BaseProvider):
@@ -59,7 +65,7 @@ class TestFallback:
         manager = ProviderManager(config=config)
         manager.register_provider(_AlwaysFailsProvider("failing"))
         manager.register_provider(_HealthyProvider("healthy"))
-        manager.health.set_providers(manager.registry.list())
+        manager.health.set_providers(manager.registry.providers())
         await manager.health.check_all()
         await manager.start()
 

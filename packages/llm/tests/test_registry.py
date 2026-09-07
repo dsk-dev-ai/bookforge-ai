@@ -38,9 +38,9 @@ class TestProviderRegistry:
         p2 = BaseProvider(name="b")
         registry.register(p1)
         registry.register(p2)
-        assert len(registry.list()) == 2
-        assert p1 in registry.list()
-        assert p2 in registry.list()
+        assert len(registry.providers()) == 2
+        assert p1 in registry.providers()
+        assert p2 in registry.providers()
 
     def test_list_names(self) -> None:
         registry = ProviderRegistry()

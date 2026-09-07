@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from bookforge.config.enums import LogFormat, LogLevel
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from bookforge.config.enums import LogFormat, LogLevel
 
 
 class LoggingSettings(BaseSettings):

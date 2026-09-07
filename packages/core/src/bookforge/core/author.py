@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from pydantic import BaseModel, Field, field_validator
+
 from bookforge.core.enums import Difficulty
 from bookforge.core.value_objects import URL, EmailAddress, PersonName
-from pydantic import BaseModel, Field, field_validator
 
 
 class Author(BaseModel):

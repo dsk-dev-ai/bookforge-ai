@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
+from bookforge.llm.circuit_breaker import CircuitBreaker
 from bookforge.llm.errors import ProviderUnavailable
 from bookforge.llm.health import HealthChecker
 from bookforge.llm.interfaces import Capability, LLMProvider
@@ -61,7 +62,7 @@ class ModelRouter:
     ) -> None:
         self._registry = registry
         self._health = health
-        self._circuit_breakers: dict[str, "CircuitBreaker"] = {}
+        self._circuit_breakers: dict[str, CircuitBreaker] = {}
         self._rules = rules or [
             RoutingRule(capability=Capability.CHAT, primary="nvidia", fallback="ollama"),
             RoutingRule(capability=Capability.CHAT_STREAM, primary="nvidia", fallback="ollama"),
@@ -90,7 +91,6 @@ class ModelRouter:
             InvalidProvider: If neither primary nor fallback are registered.
             ProviderUnavailable: If neither provider is available.
         """
-        from bookforge.llm.circuit_breaker import CircuitBreaker
 
         rule = self._find_rule(capability)
         if rule is None:
@@ -155,9 +155,7 @@ class ModelRouter:
         breaker = self._get_breaker(provider_name)
         breaker.record_failure()
 
-    def _get_breaker(self, provider_name: str) -> "CircuitBreaker":
-        from bookforge.llm.circuit_breaker import CircuitBreaker
-
+    def _get_breaker(self, provider_name: str) -> CircuitBreaker:
         if provider_name not in self._circuit_breakers:
             self._circuit_breakers[provider_name] = CircuitBreaker()
         return self._circuit_breakers[provider_name]

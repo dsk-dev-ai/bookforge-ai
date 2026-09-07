@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from typing import cast
 from uuid import uuid4
 
 from bookforge.research.cache import MemoryCache, ResearchCache
@@ -137,7 +138,7 @@ class ResearchManager:
         """
         cached = self._cache.get(f"job:{job_id}")
         if cached is not None:
-            return cached
+            return cast(ResearchJob, cached)
         job = self._jobs.get(job_id)
         if job is None:
             raise JobNotFoundError(job_id)

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from bookforge.core.enums import BloomLevel, Difficulty
 from pydantic import BaseModel, Field, field_validator
+
+from bookforge.core.enums import BloomLevel, Difficulty
 
 
 class Category(BaseModel):

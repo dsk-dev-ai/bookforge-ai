@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Generic, TypeVar
 
 
 class MessageRole(Enum):
@@ -82,11 +80,8 @@ class Chunk:
     usage: TokenUsage | None = None
 
 
-T = TypeVar("T")
-
-
 @dataclass(frozen=True)
-class Embedding(Generic[T]):
+class Embedding[T]:
     """A vector embedding result."""
 
     vector: list[float]
@@ -110,5 +105,5 @@ class HealthStatus:
     latency_ms: float = 0.0
     model: str | None = None
     error: str | None = None
-    checked_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    checked_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     capabilities: list[str] = field(default_factory=list)

@@ -5,15 +5,13 @@
 ## Setup
 
 ```bash
-git clone https://github.com/your-org/bookforge-ai.git
+git clone https://github.com/dsk-dev-ai/bookforge-ai.git
 cd bookforge-ai
-python3.12 -m venv .venv
-source .venv/bin/activate
-cp .env.example .env
-docker compose up -d postgres redis
-make migrate
-make lint && make test
+make setup       # install dev deps for all packages (requires uv)
+make lint && make test   # run quality gates
 ```
+
+Requires Python >= 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ## Process
 

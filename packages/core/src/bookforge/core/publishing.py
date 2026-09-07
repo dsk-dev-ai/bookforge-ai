@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from pydantic import BaseModel, Field, field_validator
+
 from bookforge.core.enums import BookStatus, ExportFormat
 from bookforge.core.value_objects import ISBN, URL, Version
-from pydantic import BaseModel, Field, field_validator
 
 
 class PublishingInfo(BaseModel):

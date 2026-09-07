@@ -12,7 +12,10 @@ from typing import Any
 
 from bookforge.llm.base import BaseProvider
 from bookforge.llm.config_loader import ProviderEndpointConfig
-from bookforge.llm.errors import AuthenticationError, ProviderTimeout, ProviderUnavailable
+from bookforge.llm.errors import (
+    ProviderTimeout,
+    ProviderUnavailable,
+)
 from bookforge.llm.models import (
     ChatConfig,
     ChatResponse,
@@ -104,7 +107,7 @@ class NvidiaProvider(BaseProvider):
 
     async def health(self) -> HealthStatus:
         try:
-            response = await self._get("/v1/health", timeout=10.0)
+            await self._get("/v1/health", timeout=10.0)
             models = await self.list_models()
             return HealthStatus(
                 healthy=True,
@@ -112,7 +115,7 @@ class NvidiaProvider(BaseProvider):
                 model=models[0] if models else None,
                 capabilities=["chat", "chat_stream", "embed", "embed_stream"],
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — degrade gracefully on any provider failure
             return HealthStatus(
                 healthy=False,
                 provider=self.name,
@@ -123,7 +126,7 @@ class NvidiaProvider(BaseProvider):
         try:
             response = await self._get("/v1/models", timeout=10.0)
             return self._parse_models(response)
-        except Exception:
+        except Exception:  # noqa: BLE001 — degrade to configured model on failure
             return [self._cfg.model]
 
     def _build_chat_payload(self, messages: list[Message], model: str, config: ChatConfig) -> dict:
@@ -187,7 +190,7 @@ class NvidiaProvider(BaseProvider):
     async def _post(self, path: str, payload: dict, timeout: float) -> dict:
         raise NotImplementedError("HTTP client not injected — override _post in integration")
 
-    async def _post_stream(self, path: str, payload: dict, timeout: float) -> AsyncIterator[dict]:
+    def _post_stream(self, path: str, payload: dict, timeout: float) -> AsyncIterator[dict]:
         raise NotImplementedError("Streaming HTTP not injected — override _post_stream in integration")
 
     async def _get(self, path: str, timeout: float) -> dict:

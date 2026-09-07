@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import cast
 
 from bookforge.research.cache import MemoryCache, ResearchCache
 from bookforge.research.deduplicator import ResearchDeduplicator
@@ -95,7 +96,7 @@ class ResearchEngine:
     ) -> ResearchResult:
         cached = self._cache.get(f"research:{topic}:{input_type.value}")
         if cached is not None:
-            return cached
+            return cast(ResearchResult, cached)
 
         job = self._manager.create_job(topic=topic, input_type=input_type)
         job = self._manager.start_job(job.id)

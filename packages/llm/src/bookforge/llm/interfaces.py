@@ -58,7 +58,7 @@ class LLMProvider(ABC):
         """
 
     @abstractmethod
-    async def chat_stream(
+    def chat_stream(
         self,
         messages: list[Message],
         config: ChatConfig | None = None,
@@ -102,7 +102,7 @@ class LLMProvider(ABC):
         """
 
     @abstractmethod
-    async def embed_stream(
+    def embed_stream(
         self,
         texts: AsyncIterator[str],
         config: EmbeddingConfig | None = None,

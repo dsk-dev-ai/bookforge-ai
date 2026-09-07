@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Generic, TypeVar
-
-T = TypeVar("T")
+from typing import Any
 
 
-class SettingsCache(Generic[T]):
+class SettingsCache[T]:
     """Thread-safe cache for settings instances.
 
     Provides a simple cache-aside pattern for settings objects.

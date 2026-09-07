@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from bookforge.llm.errors import ProviderError
 from bookforge.llm.interfaces import LLMProvider
@@ -36,7 +36,7 @@ class HealthStatusCache:
         if entry is None:
             return None
         status, cached_at = entry
-        if datetime.now(timezone.utc) - cached_at > self._ttl:
+        if datetime.now(UTC) - cached_at > self._ttl:
             del self._cache[provider_name]
             return None
         return status
@@ -48,7 +48,7 @@ class HealthStatusCache:
             provider_name: The provider name.
             status: The health status to cache.
         """
-        self._cache[provider_name] = (status, datetime.now(timezone.utc))
+        self._cache[provider_name] = (status, datetime.now(UTC))
 
     def invalidate(self, provider_name: str) -> None:
         """Remove a provider's cached status.
@@ -104,7 +104,7 @@ class HealthChecker:
                 provider.health(),
                 timeout=self._timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             status = HealthStatus(
                 healthy=False,
                 provider=provider.name,

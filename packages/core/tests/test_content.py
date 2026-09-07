@@ -1,10 +1,11 @@
 """Tests for content domain entities."""
 
 import pytest
+from pydantic import ValidationError
+
 from bookforge.core.content import CodeExample, Diagram, ImageAsset, Paragraph, Table
 from bookforge.core.enums import CodeLanguage, DiagramType
 from bookforge.core.value_objects import URL, ImageDimension
-from pydantic import ValidationError
 
 
 class TestParagraph:

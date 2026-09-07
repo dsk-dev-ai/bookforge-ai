@@ -1,12 +1,13 @@
 """Tests for publishing domain entities."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
+
 from bookforge.core.enums import BookStatus, ExportFormat
 from bookforge.core.publishing import ExportInfo, PublishingInfo, ReviewInfo
 from bookforge.core.value_objects import ISBN, Version
-from pydantic import ValidationError
 
 
 class TestPublishingInfo:
@@ -82,7 +83,7 @@ class TestReviewInfo:
             ReviewInfo(reviewer_name="")
 
     def test_with_dates(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         review = ReviewInfo(
             reviewer_name="Bob",
             status=BookStatus.REVIEWING,
@@ -119,7 +120,7 @@ class TestExportInfo:
             )
 
     def test_completed_export(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         info = ExportInfo(
             id="exp1",
             export_format=ExportFormat.EPUB,

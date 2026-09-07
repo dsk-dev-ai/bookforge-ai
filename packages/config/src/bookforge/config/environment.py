@@ -4,8 +4,9 @@ import os
 from functools import lru_cache
 from typing import ClassVar
 
-from bookforge.config.enums import Environment
 from dotenv import dotenv_values
+
+from bookforge.config.enums import Environment
 
 
 class EnvironmentDetector:

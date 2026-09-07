@@ -1,6 +1,5 @@
 """Tests for the health checker."""
 
-import pytest
 
 from bookforge.llm.base import BaseProvider
 from bookforge.llm.health import HealthChecker, HealthStatusCache

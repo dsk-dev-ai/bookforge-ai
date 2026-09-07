@@ -112,7 +112,7 @@ class OllamaProvider(BaseProvider):
                 model=models[0] if models else None,
                 capabilities=["chat", "chat_stream", "embed"],
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — degrade gracefully on any provider failure
             return HealthStatus(
                 healthy=False,
                 provider=self.name,
@@ -123,7 +123,7 @@ class OllamaProvider(BaseProvider):
         try:
             response = await self._get("/api/tags", timeout=10.0)
             return self._parse_models(response)
-        except Exception:
+        except Exception:  # noqa: BLE001 — degrade to configured model on failure
             return [self._cfg.model]
 
     def _build_chat_payload(self, messages: list[Message], model: str, config: ChatConfig) -> dict:
@@ -169,7 +169,7 @@ class OllamaProvider(BaseProvider):
     async def _post(self, path: str, payload: dict, timeout: float) -> dict:
         raise NotImplementedError("HTTP client not injected — override _post in integration")
 
-    async def _post_stream(self, path: str, payload: dict, timeout: float) -> AsyncIterator[dict]:
+    def _post_stream(self, path: str, payload: dict, timeout: float) -> AsyncIterator[dict]:
         raise NotImplementedError("Streaming HTTP not injected — override _post_stream in integration")
 
     async def _get(self, path: str, timeout: float) -> dict:

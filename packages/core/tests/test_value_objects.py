@@ -2,6 +2,8 @@
 
 
 import pytest
+from pydantic import ValidationError
+
 from bookforge.core.value_objects import (
     ISBN,
     URL,
@@ -12,7 +14,6 @@ from bookforge.core.value_objects import (
     PersonName,
     Version,
 )
-from pydantic import ValidationError
 
 
 class TestPersonName:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from pydantic import BaseModel, Field, field_validator, model_validator
+
 from bookforge.core.content import CodeExample, Diagram, ImageAsset, Paragraph, Table
 from bookforge.core.enums import (
     Audience,
@@ -13,7 +15,6 @@ from bookforge.core.enums import (
 )
 from bookforge.core.reference import Reference
 from bookforge.core.value_objects import ISBN, URL, Color, Version
-from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class BookMetadata(BaseModel):

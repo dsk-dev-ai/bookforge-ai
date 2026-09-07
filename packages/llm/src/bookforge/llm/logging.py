@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
-from datetime import datetime, timezone
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 
@@ -30,7 +30,7 @@ def get_logger(name: str) -> logging.Logger:
 
 def log_provider_call(
     level: int = logging.DEBUG,
-) -> Callable[[Callable[P, R]], Callable[P, R]]:
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
     """Decorator that logs provider method calls with timing.
 
     Args:
@@ -40,19 +40,19 @@ def log_provider_call(
         A decorator that wraps an async function with logging.
     """
 
-    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+    def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
         @wraps(func)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            start = datetime.now(timezone.utc)
+            start = datetime.now(UTC)
             func_name = func.__qualname__
 
             try:
                 result = await func(*args, **kwargs)  # type: ignore
-                elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+                elapsed = (datetime.now(UTC) - start).total_seconds()
                 logger.log(level, "%s succeeded in %.3fs", func_name, elapsed)
                 return result
             except ProviderError:
-                elapsed = (datetime.now(timezone.utc) - start).total_seconds()
+                elapsed = (datetime.now(UTC) - start).total_seconds()
                 logger.warning("%s failed after %.3fs", func_name, elapsed)
                 raise
 
@@ -80,7 +80,7 @@ def build_log_context(
         "subsystem": "provider_manager",
         "provider": provider_name,
         "operation": operation,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     if extra:
         context.update(extra)

@@ -1,14 +1,11 @@
 """Tests for request/response models."""
 
 from bookforge.llm.models import (
-    ChatConfig,
     ChatResponse,
-    Chunk,
     Embedding,
     HealthStatus,
     Message,
     MessageRole,
-    ModelInfo,
     TokenUsage,
 )
 

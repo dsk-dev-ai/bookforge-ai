@@ -2,6 +2,7 @@
 
 
 import pytest
+
 from bookforge.config.enums import Environment
 from bookforge.config.environment import EnvironmentDetector, get_environment
 

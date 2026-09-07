@@ -1,10 +1,11 @@
 """Tests for author entity."""
 
 import pytest
+from pydantic import ValidationError
+
 from bookforge.core.author import Author
 from bookforge.core.enums import Difficulty
 from bookforge.core.value_objects import EmailAddress, PersonName
-from pydantic import ValidationError
 
 
 class TestAuthor:

@@ -1,10 +1,11 @@
 """Tests for reference domain entities."""
 
 import pytest
+from pydantic import ValidationError
+
 from bookforge.core.enums import ReferenceType
 from bookforge.core.reference import Bibliography, Citation, Reference
 from bookforge.core.value_objects import URL
-from pydantic import ValidationError
 
 
 class TestReference:

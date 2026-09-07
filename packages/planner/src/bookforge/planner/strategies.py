@@ -82,23 +82,27 @@ class DependencyOrderedStrategy(PlanningStrategy):
             return blueprint
 
         b = blueprint.model_copy()
+        if not b.outline or not b.dependency_graph:
+            return blueprint
+
         sorted_titles = b.dependency_graph.topological_sort()
+        if not sorted_titles:
+            return blueprint
         title_map = {c.title: c for c in b.outline.chapters}
         sorted_chapters: list[ChapterPlan] = []
-        for t in sorted_titles:
-            if t in title_map:
-                sorted_chapters.append(title_map[t])
+        for title in sorted_titles:
+            if title in title_map:
+                sorted_chapters.append(title_map[title])
 
-        for c in sorted_titles:
-            if c in title_map:
-                sorted_chapters.append(title_map[c])
+        if not sorted_chapters:
+            return blueprint
 
         deduped: list[ChapterPlan] = []
         seen: set[str] = set()
-        for c in sorted_chapters:
-            if c.title not in seen:
-                seen.add(c.title)
-                deduped.append(c)
+        for chapter in sorted_chapters:
+            if chapter.title not in seen:
+                seen.add(chapter.title)
+                deduped.append(chapter)
 
         if b.outline:
             b.outline.chapters = deduped
@@ -115,9 +119,11 @@ class DifficultyProgressionStrategy(PlanningStrategy):
             return blueprint
 
         b = blueprint.model_copy()
+        if not b.outline:
+            return blueprint
+
         sorted_chapters = sorted(b.outline.chapters, key=lambda c: c.difficulty)
-        if b.outline:
-            b.outline.chapters = sorted_chapters
+        b.outline.chapters = sorted_chapters
 
         return b
 

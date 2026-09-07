@@ -16,6 +16,9 @@ class SequenceOptimizer:
             return blueprint
 
         b = blueprint.model_copy()
+        if not b.outline:
+            return blueprint
+
         b.outline.chapters = self._optimize_chapter_order(b.outline)
         b.learning_path = self._build_learning_path(b)
         return b

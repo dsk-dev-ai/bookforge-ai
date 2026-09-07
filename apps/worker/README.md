@@ -1,5 +1,8 @@
 # `@bookforge/worker`
 
+> **Status: planned** — this service is specified in `docs/ARCHITECTURE.md` for a future phase (Phase 05). No implementation ships yet. See [docs/ROADMAP.md](../../docs/ROADMAP.md).
+
+
 Celery background worker for pipeline execution.
 
 ## Responsibilities

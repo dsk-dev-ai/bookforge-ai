@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import date
 
+from pydantic import BaseModel, Field, field_validator, model_validator
+
 from bookforge.core.enums import ReferenceType
 from bookforge.core.value_objects import URL
-from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Reference(BaseModel):

@@ -36,7 +36,7 @@ class BaseProvider(LLMProvider):
     async def chat(self, messages: list[Message], config: ChatConfig | None = None) -> ChatResponse:
         raise ProviderError(f"{self.name} does not support chat", provider_name=self.name)
 
-    async def chat_stream(
+    def chat_stream(
         self,
         messages: list[Message],
         config: ChatConfig | None = None,
@@ -46,7 +46,7 @@ class BaseProvider(LLMProvider):
     async def embed(self, texts: list[str], config: EmbeddingConfig | None = None) -> list[Embedding]:
         raise ProviderError(f"{self.name} does not support embeddings", provider_name=self.name)
 
-    async def embed_stream(
+    def embed_stream(
         self,
         texts: AsyncIterator[str],
         config: EmbeddingConfig | None = None,

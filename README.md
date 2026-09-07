@@ -190,11 +190,7 @@ bookforge-ai/
 ├── config/               # YAML configuration files
 ├── docs/                 # Architecture and design documentation
 ├── templates/            # Book, chapter, and section templates
-├── books/                # Generated book output
-├── assets/               # Static assets
-├── scripts/              # Utility scripts
-├── docker/               # Docker configurations
-├── docker-compose.yml
+├── .github/workflows/    # CI pipeline
 ├── Makefile
 └── .env.example
 ```
@@ -223,13 +219,15 @@ bookforge-ai/
 ## Quick Start
 
 ```bash
-git clone https://github.com/your-org/bookforge-ai.git
+git clone https://github.com/dsk-dev-ai/bookforge-ai.git
 cd bookforge-ai
-cp .env.example .env
-docker compose up -d postgres redis
-make migrate
-make dev
+make setup        # install dev tooling for all packages (requires uv)
+make test         # run every package's test suite
+make check        # lint + typecheck + test
 ```
+
+Each package is fully type-checked (mypy strict), linted (ruff), and tested
+(pytest). See the [Makefile](Makefile) for all available targets.
 
 ---
 

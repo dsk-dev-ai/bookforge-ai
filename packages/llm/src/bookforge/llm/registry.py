@@ -55,7 +55,7 @@ class ProviderRegistry:
             raise InvalidProvider(name)
         return provider
 
-    def list(self) -> list[LLMProvider]:
+    def providers(self) -> list[LLMProvider]:
         """Return all registered providers.
 
         Returns:

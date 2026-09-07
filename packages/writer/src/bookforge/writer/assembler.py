@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from bookforge.writer.models import DraftBook, DraftChapter
+from bookforge.writer.models import DraftBook, DraftChapter, DraftSection
 
 
 class MarkdownAssembler:
@@ -49,7 +49,7 @@ class MarkdownAssembler:
                 parts.append(f"\n> {chapter.goal}\n")
         return "\n\n".join(parts)
 
-    def _assemble_section(self, section, level: int = 3) -> str:
+    def _assemble_section(self, section: DraftSection, level: int = 3) -> str:
         parts: list[str] = []
         prefix = "#" * level
         if section.content:

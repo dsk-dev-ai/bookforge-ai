@@ -1,12 +1,13 @@
 """Tests for configuration validation."""
 
 import pytest
+from pydantic import ValidationError
+
 from bookforge.config.application import ApplicationSettings, EnvironmentSettings
 from bookforge.config.enums import Environment
 from bookforge.config.providers import NvidiaSettings, OllamaSettings, ProviderSettings
 from bookforge.config.validator import assert_valid_config, validate_settings
 from bookforge.config.writer import WriterSettings
-from pydantic import ValidationError
 
 
 class TestApplicationSettings:

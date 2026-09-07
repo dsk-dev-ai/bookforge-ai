@@ -1,6 +1,8 @@
 """Tests for book domain entities."""
 
 import pytest
+from pydantic import ValidationError
+
 from bookforge.core.book import (
     Book,
     BookConfiguration,
@@ -22,7 +24,6 @@ from bookforge.core.enums import (
 )
 from bookforge.core.serialization import from_yaml, to_yaml
 from bookforge.core.value_objects import Version
-from pydantic import ValidationError
 
 
 class TestBookMetadata:

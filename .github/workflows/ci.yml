@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dev dependencies
+        run: |
+          for p in config core llm planner research writer; do
+            uv sync --extra dev --project packages/$p
+          done
+      - name: Lint
+        run: |
+          for p in config core llm planner research writer; do
+            (cd packages/$p && uv run ruff check src tests)
+          done
+      - name: Type check
+        run: |
+          for p in config core llm planner research writer; do
+            uv run --project packages/$p mypy -p bookforge.$p
+          done
+      - name: Test
+        run: |
+          for p in config core llm planner research writer; do
+            (cd packages/$p && uv run pytest -q)
+          done

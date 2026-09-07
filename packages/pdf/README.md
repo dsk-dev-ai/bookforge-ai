@@ -1,5 +1,8 @@
 # `@bookforge/pdf`
 
+> **Status: planned** — this subsystem is specified in `docs/ARCHITECTURE.md` and `docs/PIPELINE.md` for a future phase. No implementation ships yet. See [docs/ROADMAP.md](../../docs/ROADMAP.md).
+
+
 Publishing Engine subsystem — PDF and EPUB compilation.
 
 ## Responsibilities

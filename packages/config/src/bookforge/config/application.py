@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from bookforge.config.enums import Environment
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from bookforge.config.enums import Environment
 
 
 class EnvironmentSettings(BaseSettings):

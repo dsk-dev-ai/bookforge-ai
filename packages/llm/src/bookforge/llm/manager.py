@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
+from typing import Any, cast
 
 from bookforge.llm.config_loader import ConfigLoader, RuntimeConfig
 from bookforge.llm.errors import ProviderError, ProviderUnavailable
@@ -112,7 +113,7 @@ class ProviderManager:
 
         Call once after registering all providers.
         """
-        self._health.set_providers(self._registry.list())
+        self._health.set_providers(self._registry.providers())
         if not self._started:
             await self._health.start_periodic()
             self._started = True
@@ -140,7 +141,8 @@ class ProviderManager:
             ProviderUnavailable: If no provider is available.
         """
         route = await self._router.route(Capability.CHAT)
-        return await self._execute_with_guards(route, "chat", messages, config)
+        result = await self._execute_with_guards(route, "chat", messages, config)
+        return cast(ChatResponse, result)
 
     def chat_stream(
         self,
@@ -164,7 +166,8 @@ class ProviderManager:
             ProviderUnavailable: If no provider is available.
         """
         route = await self._router.route(Capability.EMBED)
-        return await self._execute_with_guards(route, "embed", texts, config)
+        result = await self._execute_with_guards(route, "embed", texts, config)
+        return cast(list[Embedding], result)
 
     async def get_provider_health(self, provider_name: str) -> HealthStatus | None:
         """Return cached health for a specific provider.
@@ -201,35 +204,73 @@ class ProviderManager:
     def _record_failure(self, provider_name: str) -> None:
         self._router.record_failure(provider_name)
 
-    async def _execute_with_guards(self, route: RouteResult, operation: str, *args, **kwargs):
+    async def _execute_with_guards(
+        self, route: RouteResult, operation: str, *args: Any, **kwargs: Any
+    ) -> ChatResponse | list[Embedding]:
         provider = route.provider
         provider_name = route.provider_name
 
         await self._enforce_rate_limit(provider_name)
 
         if operation == "chat":
+            return await self._execute_chat(provider, provider_name, operation, args, kwargs, route)
+        if operation == "embed":
+            return await self._execute_embed(provider, provider_name, operation, args, kwargs, route)
+        raise ValueError(f"Unknown operation: {operation}")
 
-            async def _do() -> ChatResponse:
-                return await provider.chat(*args, **kwargs)  # type: ignore
-        elif operation == "embed":
-
-            async def _do() -> list[Embedding]:
-                return await provider.embed(*args, **kwargs)  # type: ignore
-        else:
-            raise ValueError(f"Unknown operation: {operation}")
-
+    async def _execute_chat(
+        self,
+        provider: LLMProvider,
+        provider_name: str,
+        operation: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        route: RouteResult,
+    ) -> ChatResponse:
         try:
-            result = await with_retry(_do, policy=self._retry_policy)
+            result = await with_retry(
+                lambda: provider.chat(*args, **kwargs), policy=self._retry_policy
+            )
             self._record_success(provider_name)
             return result
         except ProviderError:
-            self._record_failure(provider_name)
-            if self._fallback_enabled and not route.used_fallback:
-                route = await self._router.route(
-                    Capability.CHAT if operation == "chat" else Capability.EMBED
-                )
-                return await self._execute_with_guards(route, operation, *args, **kwargs)
-            raise ProviderUnavailable(
-                provider_name=provider_name,
-                reason=f"Operation '{operation}' failed on all available providers",
+            fallback = await self._fallback_or_raise(provider_name, operation, args, kwargs, route)
+            return cast(ChatResponse, fallback)
+
+    async def _execute_embed(
+        self,
+        provider: LLMProvider,
+        provider_name: str,
+        operation: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        route: RouteResult,
+    ) -> list[Embedding]:
+        try:
+            result = await with_retry(
+                lambda: provider.embed(*args, **kwargs), policy=self._retry_policy
             )
+            self._record_success(provider_name)
+            return result
+        except ProviderError:
+            fallback = await self._fallback_or_raise(provider_name, operation, args, kwargs, route)
+            return cast(list[Embedding], fallback)
+
+    async def _fallback_or_raise(
+        self,
+        provider_name: str,
+        operation: str,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        route: RouteResult,
+    ) -> ChatResponse | list[Embedding]:
+        self._record_failure(provider_name)
+        if self._fallback_enabled and not route.used_fallback:
+            route = await self._router.route(
+                Capability.CHAT if operation == "chat" else Capability.EMBED
+            )
+            return await self._execute_with_guards(route, operation, *args, **kwargs)
+        raise ProviderUnavailable(
+            provider_name=provider_name,
+            reason=f"Operation '{operation}' failed on all available providers",
+        )

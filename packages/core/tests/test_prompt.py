@@ -1,9 +1,10 @@
 """Tests for prompt template entity."""
 
 import pytest
+from pydantic import ValidationError
+
 from bookforge.core.enums import Difficulty
 from bookforge.core.prompt import PromptTemplate
-from pydantic import ValidationError
 
 
 class TestPromptTemplate:

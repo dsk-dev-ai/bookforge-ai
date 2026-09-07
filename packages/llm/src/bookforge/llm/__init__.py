@@ -10,7 +10,6 @@ from bookforge.llm.errors import (
     RateLimitError,
 )
 from bookforge.llm.interfaces import Capability, LLMProvider
-from bookforge.llm.models import Message, MessageRole
 from bookforge.llm.manager import ProviderManager
 from bookforge.llm.models import (
     ChatConfig,
@@ -19,6 +18,8 @@ from bookforge.llm.models import (
     Embedding,
     EmbeddingConfig,
     HealthStatus,
+    Message,
+    MessageRole,
     ModelInfo,
     TokenUsage,
 )

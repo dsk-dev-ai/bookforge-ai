@@ -1,9 +1,10 @@
 """Tests for taxonomy entities."""
 
 import pytest
+from pydantic import ValidationError
+
 from bookforge.core.enums import BloomLevel, Difficulty
 from bookforge.core.taxonomy import Category, LearningObjective, Tag
-from pydantic import ValidationError
 
 
 class TestCategory:

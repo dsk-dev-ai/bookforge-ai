@@ -23,10 +23,10 @@ class ResearchExporter:
     """
 
     def export_result_to_dict(self, result: ResearchResult) -> dict[str, Any]:
-        return result.model_dump()  # type: ignore[no-any-return]
+        return result.model_dump()
 
     def export_result_to_json(self, result: ResearchResult, indent: int = 2) -> str:
-        return result.model_dump_json(indent=indent)  # type: ignore[no-any-return]
+        return result.model_dump_json(indent=indent)
 
     def export_sources_to_dict(self, sources: list[ResearchSource]) -> list[dict[str, Any]]:
         return [s.model_dump() for s in sources]

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
+
 from bookforge.core.enums import CodeLanguage, DiagramType
 from bookforge.core.value_objects import URL, ImageDimension
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 class Paragraph(BaseModel):
