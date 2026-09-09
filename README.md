@@ -2,6 +2,9 @@
 
 > AI-powered technical eBook publishing platform.
 
+[![CI](https://github.com/dsk-dev-ai/bookforge-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/dsk-dev-ai/bookforge-ai/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ---
 
 ## Table of Contents
